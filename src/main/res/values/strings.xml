@@ -62,6 +62,7 @@
     <string name="pref_category_sns">Moments</string>
     <string name="pref_toggle_prevent_moment_delete">Prevent Deleting Moments</string>
     <string name="pref_toggle_prevent_comment_delete">Prevent Deleting Comments</string>
+    <string name="pref_toggle_new_comment_notification">Show Notifications for New Comments</string>
     <string name="pref_toggle_keyword_blacklist">Toggle Keyword Blacklist</string>
     <string name="pref_toggle_keyword_blacklist_summary">See goodbye to those PDA couples!</string>
     <string name="pref_list_keyword_blacklist">Keyword Blacklist</string>

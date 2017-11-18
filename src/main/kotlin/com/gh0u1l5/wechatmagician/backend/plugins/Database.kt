@@ -1,6 +1,10 @@
 package com.gh0u1l5.wechatmagician.backend.plugins
 
+import android.app.AndroidAppHelper
+import android.app.Notification
+import android.app.NotificationManager
 import android.content.ContentValues
+import android.content.Context
 import com.gh0u1l5.wechatmagician.C
 import com.gh0u1l5.wechatmagician.Global.STATUS_FLAG_DATABASE
 import com.gh0u1l5.wechatmagician.Version
@@ -11,6 +15,7 @@ import com.gh0u1l5.wechatmagician.storage.SnsBlacklist
 import com.gh0u1l5.wechatmagician.storage.SnsDatabase.snsDB
 import com.gh0u1l5.wechatmagician.storage.Strings
 import com.gh0u1l5.wechatmagician.util.MessageUtil
+import com.gh0u1l5.wechatmagician.util.MessageUtil.parseSnsComment
 import com.gh0u1l5.wechatmagician.util.PackageUtil
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
@@ -109,6 +114,37 @@ object Database {
                         handleCommentDelete(curActionBuf, values)
                     }
                 }
+            }
+        })
+
+        findAndHookMethod(
+                pkg.SQLiteDatabaseClass, "insertWithOnConflict",
+                C.String, C.String, C.ContentValues, C.Int, object : XC_MethodHook() {
+            @Throws(Throwable::class)
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                val table = param.args[0] as String? ?: return
+                val values = param.args[2] as ContentValues? ?: return
+
+                if (!preferences!!.getBoolean("settings_sns_new_comment_notification", true)) {
+                    return
+                }
+
+                val context = AndroidAppHelper.currentApplication() as Context
+                val notifyMgr = context.applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                val parsedMsg = when (table) {
+                    "SnsComment" -> parseSnsComment(values)
+                    else -> return
+                }
+                if (parsedMsg?.get("content").isNullOrBlank()) return
+                val notification = when (table) {
+                    "SnsComment" -> Notification.Builder(context)
+                            .setSmallIcon(android.R.drawable.sym_action_chat)
+                            .setContentTitle("${parsedMsg?.get("sender")} 新评论")
+                            .setContentText("${parsedMsg?.get("content")}")
+                            .build()
+                    else -> return
+                }
+                notifyMgr.notify(notification.hashCode(), notification)
             }
         })
 
