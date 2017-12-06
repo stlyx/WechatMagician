@@ -131,8 +131,9 @@ object Database {
             }
         })
 
+        // Hook SQLiteDatabase.insert to send notification when WeChat receives new SNS comments.
         findAndHookMethod(
-                pkg.SQLiteDatabaseClass, "insertWithOnConflict",
+                pkg.SQLiteDatabase, "insertWithOnConflict",
                 C.String, C.String, C.ContentValues, C.Int, object : XC_MethodHook() {
             @Throws(Throwable::class)
             override fun beforeHookedMethod(param: MethodHookParam) {
