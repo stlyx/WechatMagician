@@ -5,11 +5,17 @@ import android.view.Gravity
 import android.view.View
 import android.widget.*
 import com.gh0u1l5.wechatmagician.C
-import com.gh0u1l5.wechatmagician.frontend.WechatListPopupAdapter
+import com.gh0u1l5.wechatmagician.frontend.wechat.ListPopupAdapter
+import com.gh0u1l5.wechatmagician.frontend.wechat.ListPopupPosition
 import com.gh0u1l5.wechatmagician.storage.Strings
+import com.gh0u1l5.wechatmagician.storage.Strings.MENU_SNS_FORWARD
+import com.gh0u1l5.wechatmagician.storage.Strings.MENU_SNS_SCREENSHOT
+import com.gh0u1l5.wechatmagician.storage.Strings.PROMPT_SCREENSHOT
+import com.gh0u1l5.wechatmagician.storage.Strings.PROMPT_WAIT
 import com.gh0u1l5.wechatmagician.util.FileUtil
 import com.gh0u1l5.wechatmagician.util.ImageUtil
 import com.gh0u1l5.wechatmagician.util.ViewUtil
+import com.gh0u1l5.wechatmagician.util.ViewUtil.dp2px
 import de.robv.android.xposed.XposedHelpers.findFirstFieldByExactType
 import java.lang.reflect.Field
 
@@ -61,13 +67,27 @@ object WechatEvents {
     }
 
     // Show a popup menu in SnsTimelineUI
-    fun onTimelineItemLongClick(parent: AdapterView<*>, view: View, snsId: Long): Boolean {
-        val operations = listOf(str["menu_sns_forward"], str["menu_sns_screenshot"])
+    fun onTimelineItemLongClick(parent: AdapterView<*>, view: View, snsId: Long, position: ListPopupPosition?): Boolean {
+        val operations = listOf(str[MENU_SNS_FORWARD], str[MENU_SNS_SCREENSHOT])
         ListPopupWindow(parent.context).apply {
-            width = 390
-            anchorView = view
+            if (position != null) {
+                // Calculate list view size
+                val location = IntArray(2)
+                position.anchor.getLocationOnScreen(location)
+                val bottom = location[1] + position.anchor.height
+
+                // Set position for popup window
+                anchorView = position.anchor
+                horizontalOffset = position.x - position.anchor.left
+                verticalOffset = position.y - bottom
+            } else {
+                anchorView = view
+            }
+
+            // Set general properties for popup window
+            width = parent.context.dp2px(100)
             setDropDownGravity(Gravity.CENTER)
-            setAdapter(WechatListPopupAdapter(view.context, operations))
+            setAdapter(ListPopupAdapter(view.context, operations))
             setOnItemClickListener { _, _, operation, _ ->
                 onTimelineItemPopupMenuSelected(view, snsId, operation)
                 dismiss()
@@ -82,7 +102,7 @@ object WechatEvents {
             0 -> { // Forward
                 ForwardAsyncTask(snsId, itemView.context).execute()
                 Toast.makeText(
-                        itemView.context, str["prompt_wait"], Toast.LENGTH_SHORT
+                        itemView.context, str[PROMPT_WAIT], Toast.LENGTH_SHORT
                 ).show()
                 return true
             }
@@ -92,7 +112,7 @@ object WechatEvents {
                 FileUtil.writeBitmapToDisk(path, bitmap)
                 FileUtil.notifyNewMediaFile(path, itemView.context)
                 Toast.makeText(
-                        itemView.context, str["prompt_screenshot"] + path, Toast.LENGTH_SHORT
+                        itemView.context, str[PROMPT_SCREENSHOT] + path, Toast.LENGTH_SHORT
                 ).show()
                 return true
             }

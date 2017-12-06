@@ -7,18 +7,20 @@ import android.content.ContentValues
 import android.content.Context
 import com.gh0u1l5.wechatmagician.C
 import com.gh0u1l5.wechatmagician.Global.STATUS_FLAG_DATABASE
-import com.gh0u1l5.wechatmagician.Version
 import com.gh0u1l5.wechatmagician.backend.WechatPackage
-import com.gh0u1l5.wechatmagician.storage.MessageCache
 import com.gh0u1l5.wechatmagician.storage.Preferences
-import com.gh0u1l5.wechatmagician.storage.SnsBlacklist
-import com.gh0u1l5.wechatmagician.storage.SnsDatabase.snsDB
 import com.gh0u1l5.wechatmagician.storage.Strings
+import com.gh0u1l5.wechatmagician.storage.Strings.LABEL_DELETED
+import com.gh0u1l5.wechatmagician.storage.cache.MessageCache
+import com.gh0u1l5.wechatmagician.storage.database.MainDatabase.mainDB
+import com.gh0u1l5.wechatmagician.storage.database.SnsDatabase.snsDB
+import com.gh0u1l5.wechatmagician.storage.list.SnsBlacklist
 import com.gh0u1l5.wechatmagician.util.MessageUtil
 import com.gh0u1l5.wechatmagician.util.MessageUtil.parseSnsComment
 import com.gh0u1l5.wechatmagician.util.PackageUtil
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
+import de.robv.android.xposed.XposedBridge.hookAllConstructors
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.XposedHelpers.callMethod
 import de.robv.android.xposed.XposedHelpers.findAndHookMethod
@@ -36,34 +38,46 @@ object Database {
 
     @JvmStatic fun hookDatabase() {
         when (null) {
-            pkg.SQLiteDatabaseClass,
+            pkg.SQLiteDatabase,
             pkg.SQLiteCursorFactory,
             pkg.SQLiteErrorHandler -> return
         }
 
-        // Hook SQLiteDatabase.openDatabase to capture the database instance for SNS.
+        // Hook SQLiteDatabase constructors to catch the database instances.
+        hookAllConstructors(pkg.SQLiteDatabase, object : XC_MethodHook() {
+            @Throws(Throwable::class)
+            override fun afterHookedMethod(param: MethodHookParam) {
+                val path = param.thisObject.toString()
+                if (path.endsWith("EnMicroMsg.db")) {
+                    if (mainDB !== param.thisObject) {
+                        mainDB = param.thisObject
+                    }
+                }
+            }
+        })
+
+        // Hook SQLiteDatabase.openDatabase to initialize the database instance for SNS.
         findAndHookMethod(
-                pkg.SQLiteDatabaseClass, "openDatabase",
+                pkg.SQLiteDatabase, "openDatabase",
                 C.String, pkg.SQLiteCursorFactory, C.Int, pkg.SQLiteErrorHandler, object : XC_MethodHook() {
             @Throws(Throwable::class)
             override fun afterHookedMethod(param: MethodHookParam) {
-                val path = param.args[0] as String?
-                if (path?.endsWith("SnsMicroMsg.db") != true) {
-                    return
-                }
-                if (snsDB !== param.result) {
-                    snsDB = param.result
-                    // Force Wechat to retrieve existing SNS data from remote server.
-                    val deleted = ContentValues().apply { put("sourceType", 0) }
-                    callMethod(snsDB, "delete", "snsExtInfo3", "local_flag=0", null)
-                    callMethod(snsDB, "update", "SnsInfo", deleted, "sourceType in (8,10,12,14)", null)
+                val path = param.args[0] as String? ?: return
+                if (path.endsWith("SnsMicroMsg.db")) {
+                    if (snsDB !== param.result) {
+                        snsDB = param.result
+                        // Force Wechat to retrieve existing SNS data from remote server.
+                        val deleted = ContentValues().apply { put("sourceType", 0) }
+                        callMethod(snsDB, "delete", "snsExtInfo3", "local_flag=0", null)
+                        callMethod(snsDB, "update", "SnsInfo", deleted, "sourceType in (8,10,12,14)", null)
+                    }
                 }
             }
         })
 
         // Hook SQLiteDatabase.update to prevent Wechat from recalling messages or deleting moments.
         findAndHookMethod(
-                pkg.SQLiteDatabaseClass, "updateWithOnConflict",
+                pkg.SQLiteDatabase, "updateWithOnConflict",
                 C.String, C.ContentValues, C.String, C.StringArray, C.Int, object : XC_MethodHook() {
             @Throws(Throwable::class)
             override fun beforeHookedMethod(param: MethodHookParam) {
@@ -153,7 +167,7 @@ object Database {
 
     // handleMessageRecall notifies user that someone has recalled the given message.
     private fun handleMessageRecall(values: ContentValues) {
-        if (pkg.MsgStorageObject == null || pkg.MsgStorageInsertMethod == "") {
+        if (pkg.MsgStorageObject == null || pkg.MsgStorageInsertMethod == null) {
             return
         }
 
@@ -169,12 +183,9 @@ object Database {
             XposedHelpers.setObjectField(copy, "field_content", values["content"])
             XposedHelpers.setLongField(copy, "field_createTime", createTime + 1L)
 
-            val version = pkg.version ?: return
-            when {
-                version >= Version("6.5.8") ->
-                    XposedHelpers.callMethod(pkg.MsgStorageObject, pkg.MsgStorageInsertMethod, copy, false)
-                else ->
-                    XposedHelpers.callMethod(pkg.MsgStorageObject, pkg.MsgStorageInsertMethod, copy)
+            when (pkg.MsgStorageInsertMethod?.parameterTypes?.size) {
+                1 -> pkg.MsgStorageInsertMethod?.invoke(pkg.MsgStorageObject, copy)
+                2 -> pkg.MsgStorageInsertMethod?.invoke(pkg.MsgStorageObject, copy, false)
             }
         } catch (e: Throwable) {
             XposedBridge.log("DB => Handle message recall failed: $e")
@@ -183,7 +194,7 @@ object Database {
 
     // handleMomentDelete notifies user that someone has deleted the given moment.
     private fun handleMomentDelete(content: ByteArray?, values: ContentValues) {
-        MessageUtil.notifyInfoDelete(str["label_deleted"], content)?.let { msg ->
+        MessageUtil.notifyInfoDelete(str[LABEL_DELETED], content)?.let { msg ->
             values.remove("sourceType")
             values.put("content", msg)
         }
@@ -191,7 +202,7 @@ object Database {
 
     // handleCommentDelete notifies user that someone has deleted the given comment in moments.
     private fun handleCommentDelete(curActionBuf: ByteArray?, values: ContentValues) {
-        MessageUtil.notifyCommentDelete(str["label_deleted"], curActionBuf)?.let { msg ->
+        MessageUtil.notifyCommentDelete(str[LABEL_DELETED], curActionBuf)?.let { msg ->
             values.remove("commentflag")
             values.put("curActionBuf", msg)
         }

@@ -1,13 +1,15 @@
 package com.gh0u1l5.wechatmagician.frontend
 
-import android.app.Activity
-import android.app.Fragment
 import android.os.Bundle
 import android.support.design.widget.NavigationView
+import android.support.v4.app.Fragment
 import android.support.v7.app.ActionBarDrawerToggle
+import android.support.v7.app.AppCompatActivity
 import android.view.Gravity
 import android.view.MenuItem
 import android.widget.TextView
+import com.gh0u1l5.wechatmagician.Global.PREFERENCE_NAME_DEVELOPER
+import com.gh0u1l5.wechatmagician.Global.PREFERENCE_NAME_SETTINGS
 import com.gh0u1l5.wechatmagician.R
 import com.gh0u1l5.wechatmagician.frontend.fragments.DonateFragment
 import com.gh0u1l5.wechatmagician.frontend.fragments.PrefFragment
@@ -18,7 +20,7 @@ import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.app_bar_main.*
 import kotlinx.android.synthetic.main.content_main.*
 
-class MainActivity : Activity(),
+class MainActivity : AppCompatActivity(),
         NavigationView.OnNavigationItemSelectedListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,7 +42,7 @@ class MainActivity : Activity(),
         }
 
         if (main_container != null) {
-            fragmentManager.beginTransaction()
+            supportFragmentManager.beginTransaction()
                     .replace(R.id.main_container, StatusFragment.newInstance())
                     .commit()
         }
@@ -64,10 +66,10 @@ class MainActivity : Activity(),
                 StatusFragment.newInstance()
             }
             R.id.nav_settings -> {
-                PrefFragment.newInstance(R.xml.pref_settings, "settings")
+                PrefFragment.newInstance(R.xml.pref_settings, PREFERENCE_NAME_SETTINGS)
             }
             R.id.nav_developer -> {
-                PrefFragment.newInstance(R.xml.pref_developer, "developer")
+                PrefFragment.newInstance(R.xml.pref_developer, PREFERENCE_NAME_DEVELOPER)
             }
             R.id.nav_support -> {
                 SupportFragment.newInstance()
@@ -78,7 +80,7 @@ class MainActivity : Activity(),
             else ->
                 throw Error("Unknown navigation item: ${item.itemId}")
         }
-        fragmentManager.beginTransaction()
+        supportFragmentManager.beginTransaction()
                 .replace(R.id.main_container, fragment)
                 .commit()
 

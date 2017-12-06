@@ -7,35 +7,72 @@ import de.robv.android.xposed.XposedBridge.log
 // to support devices that cannot use resource hooks.
 object Strings {
 
+    val TITLE_SECRET_FRIEND           = "title_secret_friend"
+    val PROMPT_NEW_PASSWORD           = "prompt_new_password"
+    val PROMPT_VERIFY_PASSWORD        = "prompt_verify_password"
+    val PROMPT_USER_NOT_FOUND         = "prompt_user_not_found"
+    val PROMPT_SET_PASSWORD           = "prompt_set_password"
+    val PROMPT_CORRECT_PASSWORD       = "prompt_correct_password"
+    val PROMPT_WRONG_PASSWORD         = "prompt_wrong_password"
+    val MENU_SNS_FORWARD              = "menu_sns_forward"
+    val MENU_SNS_SCREENSHOT           = "menu_sns_screenshot"
+    val PROMPT_WAIT                   = "prompt_wait"
+    val PROMPT_SCREENSHOT             = "prompt_screenshot"
+    val PROMPT_SNS_INVALID            = "prompt_sns_invalid"
+    val PROMPT_RECALL                 = "prompt_recall"
+    val LABEL_DELETED                 = "label_deleted"
+    val BUTTON_SELECT_ALL             = "button_select_all"
+    val BUTTON_OK                     = "button_ok"
+    val BUTTON_CANCEL                 = "button_cancel"
+
     @Volatile var language: String = "zh"
 
     private val resources: Map<String, Map<String, String>> = mapOf(
             "zh" to mapOf(
-                    "menu_sns_forward"    to "转发",
-                    "menu_sns_screenshot" to "截图",
-                    "prompt_wait"         to "请稍等片刻……",
-                    "prompt_screenshot"   to "截图已保存至 ",
-                    "prompt_sns_invalid"  to "数据失效或已删除",
-                    "prompt_recall"       to "妄图撤回一条消息，啧啧",
-                    "label_deleted"       to "[已删除]",
-                    "button_select_all"   to "全选"
+                    TITLE_SECRET_FRIEND           to "密友",
+                    PROMPT_NEW_PASSWORD           to "请输入新密码",
+                    PROMPT_VERIFY_PASSWORD        to "请输入解锁密码",
+                    PROMPT_USER_NOT_FOUND         to "用户不存在",
+                    PROMPT_SET_PASSWORD           to "请先设置密码",
+                    PROMPT_CORRECT_PASSWORD       to "密码正确",
+                    PROMPT_WRONG_PASSWORD         to "密码错误",
+                    MENU_SNS_FORWARD              to "转发",
+                    MENU_SNS_SCREENSHOT           to "截图",
+                    PROMPT_WAIT                   to "请稍等片刻……",
+                    PROMPT_SCREENSHOT             to "截图已保存至 ",
+                    PROMPT_SNS_INVALID            to "数据失效或已删除",
+                    PROMPT_RECALL                 to "妄图撤回一条消息，啧啧",
+                    LABEL_DELETED                 to "[已删除]",
+                    BUTTON_SELECT_ALL             to "全选",
+                    BUTTON_OK                     to "确定",
+                    BUTTON_CANCEL                 to "取消"
             ),
             "en" to mapOf(
-                    "menu_sns_forward"    to "Forward",
-                    "menu_sns_screenshot" to "Screenshot",
-                    "prompt_wait"         to "Please wait for a while......",
-                    "prompt_screenshot"   to "The screenshot has been saved to ",
-                    "prompt_sns_invalid"  to "Record is invalid or deleted.",
-                    "prompt_recall"       to "want to recall the message, idiot.",
-                    "label_deleted"       to "[Deleted]",
-                    "button_select_all"   to "All"
+                    TITLE_SECRET_FRIEND           to "Secret Friends",
+                    PROMPT_NEW_PASSWORD           to "Please enter a new password:",
+                    PROMPT_VERIFY_PASSWORD        to "Please enter your password:",
+                    PROMPT_USER_NOT_FOUND         to "User Not Found!",
+                    PROMPT_SET_PASSWORD           to "Please set password first!",
+                    PROMPT_CORRECT_PASSWORD       to "Correct Password!",
+                    PROMPT_WRONG_PASSWORD         to "Wrong Password!",
+                    MENU_SNS_FORWARD              to "Forward",
+                    MENU_SNS_SCREENSHOT           to "Screenshot",
+                    PROMPT_WAIT                   to "Please wait for a while......",
+                    PROMPT_SCREENSHOT             to "The screenshot has been saved to ",
+                    PROMPT_SNS_INVALID            to "Record is invalid or deleted.",
+                    PROMPT_RECALL                 to "want to recall the message, idiot.",
+                    LABEL_DELETED                 to "[Deleted]",
+                    BUTTON_SELECT_ALL             to "All",
+                    BUTTON_OK                     to "Okay",
+                    BUTTON_CANCEL                 to "Cancel"
             )
     )
 
     operator fun get(key: String): String {
-        val value = (resources[language] ?: resources["zh"])!![key]
+        val res = resources[language] ?: resources["zh"]
+        val value = res!![key]
         if (value == null) {
-            log("RES => Unknown resource: $key")
+            log("RES => Resource Missing: $key")
             return "???"
         }
         return value

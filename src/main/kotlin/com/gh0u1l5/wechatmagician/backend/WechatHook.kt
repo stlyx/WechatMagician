@@ -4,15 +4,19 @@ import android.content.Context
 import com.gh0u1l5.wechatmagician.C
 import com.gh0u1l5.wechatmagician.Global.FOLDER_SHARED
 import com.gh0u1l5.wechatmagician.Global.MAGICIAN_PACKAGE_NAME
+import com.gh0u1l5.wechatmagician.Global.PREFERENCE_NAME_DEVELOPER
+import com.gh0u1l5.wechatmagician.Global.PREFERENCE_NAME_SETTINGS
 import com.gh0u1l5.wechatmagician.Global.WECHAT_PACKAGE_NAME
 import com.gh0u1l5.wechatmagician.backend.plugins.*
 import com.gh0u1l5.wechatmagician.storage.Preferences
+import com.gh0u1l5.wechatmagician.storage.list.SecretFriendList
 import com.gh0u1l5.wechatmagician.util.FileUtil.getApplicationDataDir
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge.log
 import de.robv.android.xposed.XposedHelpers.findAndHookMethod
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import java.lang.Thread.sleep
 import kotlin.concurrent.thread
 
 // WechatHook is the entry point of the module, here we load all the plugins.
@@ -24,16 +28,16 @@ class WechatHook : IXposedHookLoadPackage {
     // NOTE: Hooking Application.attach is necessary because Android 4.X is not supporting
     //       multi-dex applications natively. More information are available in this link:
     //       https://github.com/rovo89/xposedbridge/issues/30
-    inline private fun hookApplicationAttach(loader: ClassLoader, crossinline callback: (Context?) -> Unit) {
+    inline private fun hookApplicationAttach(loader: ClassLoader, crossinline callback: (Context) -> Unit) {
         findAndHookMethod("android.app.Application",loader, "attach", C.Context, object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
-                callback(param.thisObject as Context?)
+                callback(param.thisObject as Context)
             }
         })
     }
 
     inline private fun tryHook(hook: () -> Unit) {
-        try { hook() } catch (e: Throwable) { log("HOOK => $e") }
+        try { hook() } catch (e: Throwable) { log(e) }
     }
 
     // NOTE: Remember to catch all the exceptions here, otherwise you may get boot loop.
@@ -49,23 +53,31 @@ class WechatHook : IXposedHookLoadPackage {
                     })
                 WECHAT_PACKAGE_NAME ->
                     hookApplicationAttach(lpparam.classLoader, { context ->
-                        handleLoadWechat(lpparam, context)
+                        thread(start = true) {
+                            // NOTE: Since 6.5.16, Wechat loads multiple DEX asynchronously using
+                            // a service called DexOptService. So we need to sleep a while, wait
+                            // for MultiDex installation.
+                            sleep(500)
+                            handleLoadWechat(lpparam, context)
+                        }
                     })
             }
         } catch (e: Throwable) { log(e) }
     }
 
-    private fun handleLoadWechat(lpparam: XC_LoadPackage.LoadPackageParam, context: Context?) {
+    private fun handleLoadWechat(lpparam: XC_LoadPackage.LoadPackageParam, context: Context) {
         val loader = lpparam.classLoader
 
         WechatPackage.init(lpparam)
-        settings.load(context, "settings")
-        developer.load(context, "developer")
+        SecretFriendList.init(context)
+        settings.load(context, PREFERENCE_NAME_SETTINGS)
+        developer.load(context, PREFERENCE_NAME_DEVELOPER)
 
         val pluginDeveloper = Developer
         pluginDeveloper.init(loader, developer)
         tryHook(pluginDeveloper::traceTouchEvents)
         tryHook(pluginDeveloper::traceActivities)
+        tryHook(pluginDeveloper::traceLogCat)
         tryHook(pluginDeveloper::enableXLog)
         tryHook(pluginDeveloper::traceXMLParse)
         tryHook(pluginDeveloper::traceDatabase)
@@ -74,10 +86,20 @@ class WechatHook : IXposedHookLoadPackage {
         pluginAutoLogin.init(settings)
         tryHook(pluginAutoLogin::enableAutoLogin)
 
-        val pluginSnsUI = SnsUI
-        tryHook(pluginSnsUI::setLongClickListenerForSnsUserUI)
-        tryHook(pluginSnsUI::setLongClickListenerForSnsTimeLineUI)
-        tryHook(pluginSnsUI::cleanTextViewBeforeForwarding)
+        val pluginUnreadCount = UnreadCount
+        pluginUnreadCount.init(settings)
+        tryHook(pluginUnreadCount::disableMessageUnreadCount)
+
+        val pluginSnsForward = SnsForward
+        tryHook(pluginSnsForward::setLongClickListenerForSnsUserUI)
+        tryHook(pluginSnsForward::setLongClickListenerForSnsTimeLineUI)
+        tryHook(pluginSnsForward::cleanTextViewBeforeForwarding)
+
+        val pluginSecretFriend = SecretFriend
+        pluginSecretFriend.init(settings)
+        tryHook(pluginSecretFriend::tamperAdapterCount)
+        tryHook(pluginSecretFriend::hideSecretFriend)
+        tryHook(pluginSecretFriend::hideSecretFriendConversation)
 
         val pluginLimits = Limits
         pluginLimits.init(settings)
@@ -97,8 +119,12 @@ class WechatHook : IXposedHookLoadPackage {
         pluginDatabase.init(settings)
         tryHook(pluginDatabase::hookDatabase)
 
-        val pluginCustomScheme = CustomScheme
-        tryHook(pluginCustomScheme::registerCustomSchemes)
+        val pluginUriRouter = UriRouter
+        tryHook(pluginUriRouter::hijackUriRouter)
+
+        val pluginSearchBar = SearchBar
+        pluginSearchBar.init(settings)
+        tryHook(pluginSearchBar::hijackSearchBar)
 
         thread(start = true) {
             val wechatDataDir = getApplicationDataDir(context)

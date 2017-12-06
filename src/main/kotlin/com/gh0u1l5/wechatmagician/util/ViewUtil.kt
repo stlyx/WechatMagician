@@ -11,6 +11,7 @@ import android.os.Build
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ListView
 import android.widget.Toast
 import com.gh0u1l5.wechatmagician.Global
 import de.robv.android.xposed.XposedBridge
@@ -70,16 +71,6 @@ object ViewUtil {
         return b
     }
 
-    // getColor finds the color according to the given resId.
-    fun getColor(context: Context, resources: Resources, resId: Int): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            resources.getColor(resId, context.theme)
-        } else {
-            @Suppress("DEPRECATION")
-            resources.getColor(resId)
-        }
-    }
-
     // openURL opens an URL using an external explorer.
     fun openURL(context: Context?, url: String?) {
         try {
@@ -87,6 +78,33 @@ object ViewUtil {
         } catch (e: Throwable) {
             Log.e(Global.LOG_TAG, "Cannot open URL $url: $e")
             Toast.makeText(context, e.localizedMessage, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Context.dp2px convert size in dp to size in px.
+    fun Context.dp2px(dip: Int): Int {
+        val scale = resources.displayMetrics.density
+        return (dip * scale + 0.5f).toInt()
+    }
+
+    // Resources.getDefaultLanguage returns current default language for the given resources
+    fun Resources.getDefaultLanguage(): String {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            configuration.locales[0]
+        } else {
+            configuration.locale
+        }.language
+    }
+
+    // ListView.getViewAtPosition returns the item view at specific position
+    fun ListView.getViewAtPosition(position: Int): View {
+        val firstItemPosition = firstVisiblePosition
+        val lastItemPosition = firstItemPosition + childCount - 1
+
+        return if (position < firstItemPosition || position > lastItemPosition) {
+            adapter.getView(position, null, this)
+        } else {
+            getChildAt(position - firstItemPosition)
         }
     }
 }

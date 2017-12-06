@@ -11,11 +11,14 @@ import com.gh0u1l5.wechatmagician.util.PackageUtil.findClassIfExists
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findClassesFromPackage
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findFieldsWithType
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findMethodsByExactParameters
+import de.robv.android.xposed.XposedBridge.log
 import de.robv.android.xposed.XposedHelpers.*
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import net.dongliu.apk.parser.ApkFile
 import net.dongliu.apk.parser.bean.DexClass
 import java.io.File
+import java.lang.reflect.Field
+import java.lang.reflect.Method
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
@@ -28,19 +31,20 @@ object WechatPackage {
     private val statusLock = ReentrantReadWriteLock()
     private val status: HashMap<String, Boolean> = hashMapOf()
 
-    // version stores the current version of Wechat
-    var version: Version? = null
-
+    var LogCat: Class<*>? = null
     var XLogSetup: Class<*>? = null
     var WebWXLoginUI: Class<*>? = null
     var RemittanceAdapter: Class<*>? = null
-    var WXCustomSchemeEntry: Class<*>? = null
-    var WXCustomSchemeEntryStart = ""
+    var ActionBarEditText: Class<*>? = null
+
+    var WXCustomScheme: Class<*>? = null
+    var WXCustomSchemeEntryMethod: Method? = null
+
     var EncEngine: Class<*>? = null
-    var EncEngineEDMethod = ""
+    var EncEngineEDMethod: Method? = null
 
     var SQLiteDatabasePkg = ""
-    var SQLiteDatabaseClass: Class<*>? = null
+    var SQLiteDatabase: Class<*>? = null
     var SQLiteCursorFactory: Class<*>? = null
     var SQLiteErrorHandler: Class<*>? = null
     var SQLiteCancellationSignal: Class<*>? = null
@@ -49,22 +53,26 @@ object WechatPackage {
     var MMFragmentActivity: Class<*>? = null
     var MMListPopupWindow: Class<*>? = null
 
+    var MMBaseAdapter: Class<*>? = null
+    var AddressAdapter: Class<*>? = null
+    var ConversationWithCacheAdapter: Class<*>? = null
+
     var SnsActivity: Class<*>? = null
     var SnsUploadUI: Class<*>? = null
-    var SnsUploadUIEditTextField = ""
+    var SnsUploadUIEditTextField: Field? = null
     var SnsUserUI: Class<*>? = null
     var SnsTimeLineUI: Class<*>? = null
 
     var AlbumPreviewUI: Class<*>? = null
     var SelectContactUI: Class<*>? = null
     var SelectConversationUI: Class<*>? = null
-    var SelectConversationUIMaxLimitMethod = ""
+    var SelectConversationUIMaxLimitMethod: Method? = null
 
     var MsgInfoClass: Class<*>? = null
     var ContactInfoClass: Class<*>? = null
 
     var MsgStorageClass: Class<*>? = null
-    var MsgStorageInsertMethod = ""
+    var MsgStorageInsertMethod: Method? = null
     @Volatile var MsgStorageObject: Any? = null
 
     val CacheMapClass = "$WECHAT_PACKAGE_NAME.a.f"
@@ -76,15 +84,13 @@ object WechatPackage {
     @Volatile var ImgStorageObject: Any? = null
 
     var XMLParserClass: Class<*>? = null
-    var XMLParseMethod = ""
+    var XMLParseMethod: Method? = null
 
     // Analyzes Wechat package statically for the name of classes.
     // WechatHook will do the runtime analysis and set the objects.
     fun init(lpparam: XC_LoadPackage.LoadPackageParam) {
         val loader = lpparam.classLoader
-
         val version = getVersion(lpparam)
-        this.version = version
 
         var apkFile: ApkFile? = null
         val classes: Array<DexClass>
@@ -96,17 +102,23 @@ object WechatPackage {
         }
 
 
+        LogCat = findClassesFromPackage(loader, classes, "$WECHAT_PACKAGE_NAME.sdk.platformtools")
+                .filterByMethod(null, "printErrStackTrace", C.String, C.Throwable, C.String, C.ObjectArray)
+                .firstOrNull("LogCat")
         XLogSetup = findClassIfExists(
                 "$WECHAT_PACKAGE_NAME.xlog.app.XLogSetup", loader)
         WebWXLoginUI = findClassIfExists(
                 "$WECHAT_PACKAGE_NAME.plugin.webwx.ui.ExtDeviceWXLoginUI", loader)
         RemittanceAdapter = findClassIfExists(
                 "$WECHAT_PACKAGE_NAME.plugin.remittance.ui.RemittanceAdapterUI", loader)
-        WXCustomSchemeEntry = findClassIfExists(
+        ActionBarEditText = findClassIfExists(
+                "$WECHAT_PACKAGE_NAME.ui.tools.ActionBarSearchView.ActionBarEditText", loader)
+
+        WXCustomScheme = findClassIfExists(
                 "$WECHAT_PACKAGE_NAME.plugin.base.stub.WXCustomSchemeEntryActivity", loader)
-        WXCustomSchemeEntryStart = findMethodsByExactParameters(
-                WXCustomSchemeEntry, C.Boolean, C.Intent
-        ).firstOrNull()?.name ?: ""
+        WXCustomSchemeEntryMethod = findMethodsByExactParameters(
+                WXCustomScheme, C.Boolean, C.Intent
+        ).firstOrNull()
 
         EncEngine = findClassesFromPackage(loader, classes, "$WECHAT_PACKAGE_NAME.modelsfs")
                 .filterByMethod(null, "seek", C.Long)
@@ -114,14 +126,14 @@ object WechatPackage {
                 .firstOrNull("EncEngine")
         EncEngineEDMethod = findMethodsByExactParameters(
                 EncEngine, C.Int, C.ByteArray, C.Int
-        ).firstOrNull()?.name ?: ""
+        ).firstOrNull()
 
 
         SQLiteDatabasePkg = when {
             version >= Version("6.5.8") -> "com.tencent.wcdb"
             else -> "com.tencent.mmdb"
         }
-        SQLiteDatabaseClass = findClassIfExists(
+        SQLiteDatabase = findClassIfExists(
                 "$SQLiteDatabasePkg.database.SQLiteDatabase", loader)
         SQLiteCursorFactory = findClassIfExists(
                 "$SQLiteDatabasePkg.database.SQLiteDatabase.CursorFactory", loader)
@@ -137,6 +149,20 @@ object WechatPackage {
         MMListPopupWindow = findClassIfExists("$pkgUI.base.MMListPopupWindow", loader)
 
 
+        AddressAdapter = findClassesFromPackage(loader, classes, "$pkgUI.contact")
+                .filterByMethod(null, "pause")
+                .firstOrNull("AddressAdapter")
+        ConversationWithCacheAdapter = findClassesFromPackage(loader, classes, "$pkgUI.conversation")
+                .filterByMethod(null, "clearCache")
+                .firstOrNull("ConversationWithCacheAdapter")
+        if (AddressAdapter != null && ConversationWithCacheAdapter != null) {
+            if (AddressAdapter?.superclass != ConversationWithCacheAdapter?.superclass) {
+                log("Unexpected base adapter: ${AddressAdapter?.superclass} and ${ConversationWithCacheAdapter?.superclass}")
+            }
+            MMBaseAdapter = AddressAdapter?.superclass
+        }
+
+
         val pkgSnsUI = "$WECHAT_PACKAGE_NAME.plugin.sns.ui"
         val snsUIClasses = findClassesFromPackage(loader, classes, pkgSnsUI)
         SnsActivity = snsUIClasses
@@ -148,7 +174,7 @@ object WechatPackage {
                 .firstOrNull("SnsUploadUI")
         SnsUploadUIEditTextField = findFieldsWithType(
                 SnsUploadUI, "$pkgSnsUI.SnsEditText"
-        ).firstOrNull()?.name ?: ""
+        ).firstOrNull()
         SnsUserUI = findClassIfExists("$pkgSnsUI.SnsUserUI", loader)
         SnsTimeLineUI = snsUIClasses
                 .filterByField("android.support.v7.app.ActionBar")
@@ -161,7 +187,7 @@ object WechatPackage {
         SelectConversationUI = findClassIfExists("$pkgUI.transmit.SelectConversationUI", loader)
         SelectConversationUIMaxLimitMethod = findMethodsByExactParameters(
                 SelectConversationUI, C.Boolean, C.Boolean
-        ).firstOrNull()?.name ?: ""
+        ).firstOrNull()
 
 
         val storageClasses = findClassesFromPackage(loader, classes, "$WECHAT_PACKAGE_NAME.storage")
@@ -187,12 +213,12 @@ object WechatPackage {
             MsgStorageInsertMethod = when {
                 version >= Version("6.5.8") ->
                     findMethodsByExactParameters(
-                            MsgStorageClass, C.Long, MsgInfoClass!!, C.Boolean
-                    ).firstOrNull()?.name ?: ""
+                        MsgStorageClass, C.Long, MsgInfoClass!!, C.Boolean
+                    ).firstOrNull()
                 else ->
                     findMethodsByExactParameters(
                         MsgStorageClass, C.Long, MsgInfoClass!!
-                    ).firstOrNull()?.name ?: ""
+                    ).firstOrNull()
             }
         }
 
@@ -210,7 +236,7 @@ object WechatPackage {
                 .firstOrNull("XMLParserClass")
         XMLParseMethod = findMethodsByExactParameters(
                 XMLParserClass, C.Map, C.String, C.String
-        ).firstOrNull()?.name ?: ""
+        ).firstOrNull()
     }
 
     // getVersion returns the version of current package / application

@@ -1,9 +1,10 @@
 package com.gh0u1l5.wechatmagician.frontend.fragments
 
-import android.app.Fragment
 import android.content.Context
 import android.os.Bundle
 import android.os.SystemClock
+import android.support.v4.app.Fragment
+import android.support.v4.content.ContextCompat
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -11,15 +12,14 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import com.gh0u1l5.wechatmagician.Global.FOLDER_SHARED
 import com.gh0u1l5.wechatmagician.Global.LOG_TAG
-import com.gh0u1l5.wechatmagician.Global.STATUS_FLAG_CUSTOM_SCHEME
 import com.gh0u1l5.wechatmagician.Global.STATUS_FLAG_DATABASE
 import com.gh0u1l5.wechatmagician.Global.STATUS_FLAG_MSG_STORAGE
 import com.gh0u1l5.wechatmagician.Global.STATUS_FLAG_RESOURCES
+import com.gh0u1l5.wechatmagician.Global.STATUS_FLAG_URI_ROUTER
 import com.gh0u1l5.wechatmagician.Global.STATUS_FLAG_XML_PARSER
 import com.gh0u1l5.wechatmagician.R
 import com.gh0u1l5.wechatmagician.util.FileUtil.getApplicationDataDir
 import com.gh0u1l5.wechatmagician.util.FileUtil.readObjectFromDisk
-import com.gh0u1l5.wechatmagician.util.ViewUtil.getColor
 import kotlinx.android.synthetic.main.fragment_status.*
 import java.io.File
 
@@ -30,11 +30,11 @@ class StatusFragment : Fragment() {
             STATUS_FLAG_RESOURCES to R.id.component_resources_status,
             STATUS_FLAG_DATABASE to R.id.component_database_status,
             STATUS_FLAG_XML_PARSER to R.id.component_xml_parser_status,
-            STATUS_FLAG_CUSTOM_SCHEME to R.id.component_custom_scheme_status
+            STATUS_FLAG_URI_ROUTER to R.id.component_uri_router_status
     )
 
-    override fun onCreateView(inflater: LayoutInflater?, container: ViewGroup?, savedInstanceState: Bundle?): View? =
-            inflater!!.inflate(R.layout.fragment_status, container, false)
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? =
+            inflater.inflate(R.layout.fragment_status, container, false)
 
     override fun onStart() {
         super.onStart()
@@ -43,8 +43,10 @@ class StatusFragment : Fragment() {
             return
         }
 
+        val context = context ?: return
+
         // Set the main banner of status fragment.
-        val colorOk = getColor(activity, resources, R.color.ok)
+        val colorOk = ContextCompat.getColor(context, R.color.ok)
         status_text.setTextColor(colorOk)
         status_text.text = getString(R.string.status_ok)
         status_image.setBackgroundColor(colorOk)
@@ -52,7 +54,7 @@ class StatusFragment : Fragment() {
         status_image.contentDescription = getString(R.string.status_ok)
 
         // Set the status for each component.
-        val status = readHookStatus(activity)
+        val status = readHookStatus(context)
         if (status != null) {
             for (entry in componentMap) {
                 if (status[entry.key] == true) {
@@ -66,7 +68,7 @@ class StatusFragment : Fragment() {
     private fun isModuleLoaded(): Boolean = false
 
     private fun setComponentIconValid(iconId: Int) {
-        val icon = activity.findViewById<ImageView>(iconId)
+        val icon = activity?.findViewById<ImageView>(iconId)
         if (icon != null) {
             icon.setImageResource(R.drawable.ic_component_valid)
             icon.contentDescription = getString(R.string.status_component_valid)

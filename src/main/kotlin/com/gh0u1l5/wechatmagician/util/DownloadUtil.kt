@@ -1,7 +1,7 @@
 package com.gh0u1l5.wechatmagician.util
 
 import com.gh0u1l5.wechatmagician.backend.WechatPackage
-import com.gh0u1l5.wechatmagician.storage.SnsCache
+import com.gh0u1l5.wechatmagician.storage.cache.SnsCache
 import de.robv.android.xposed.XposedHelpers
 import java.net.URL
 
@@ -27,7 +27,7 @@ object DownloadUtil {
         }
 
         val encEngine = XposedHelpers.newInstance(WechatPackage.EncEngine, media.main.key)
-        XposedHelpers.callMethod(encEngine, WechatPackage.EncEngineEDMethod, content, content.size)
+        WechatPackage.EncEngineEDMethod?.invoke(encEngine, content, content.size)
         XposedHelpers.callMethod(encEngine, "free")
         FileUtil.writeBytesToDisk(path, content)
     }

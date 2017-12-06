@@ -14,8 +14,10 @@ import com.gh0u1l5.wechatmagician.backend.WechatPackage
 import com.gh0u1l5.wechatmagician.backend.WechatResHook
 import com.gh0u1l5.wechatmagician.storage.Preferences
 import com.gh0u1l5.wechatmagician.storage.Strings
+import com.gh0u1l5.wechatmagician.storage.Strings.BUTTON_SELECT_ALL
+import com.gh0u1l5.wechatmagician.util.PackageUtil.findAndHookMethod
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedHelpers
+import de.robv.android.xposed.XposedHelpers.findAndHookMethod
 
 object Limits {
 
@@ -35,7 +37,7 @@ object Limits {
             return
         }
 
-        XposedHelpers.findAndHookMethod(
+        findAndHookMethod(
                 pkg.AlbumPreviewUI, "onCreate",
                 C.Bundle, object : XC_MethodHook() {
             @Throws(Throwable::class)
@@ -60,7 +62,7 @@ object Limits {
         }
 
         // Hook MMActivity.onCreateOptionsMenu to add "Select All" button.
-        XposedHelpers.findAndHookMethod(
+        findAndHookMethod(
                 pkg.MMActivity, "onCreateOptionsMenu",
                 C.Menu, object : XC_MethodHook() {
             @Throws(Throwable::class)
@@ -79,7 +81,7 @@ object Limits {
                 selectAll.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
                 if (WechatResHook.MODULE_RES == null) {
                     selectAll.isChecked = checked
-                    selectAll.title = str["button_select_all"] + "  " +
+                    selectAll.title = str[BUTTON_SELECT_ALL] + "  " +
                             if (checked) "\u2611" else "\u2610"
                     selectAll.setOnMenuItemClickListener {
                         events.onSelectContactUISelectAll(activity, !selectAll.isChecked); true
@@ -89,7 +91,7 @@ object Limits {
                     val checkedTextView = activity.layoutInflater.inflate(layout, null)
                     checkedTextView.findViewById<TextView>(R.id.ctv_text).apply {
                         setTextColor(Color.WHITE)
-                        text = str["button_select_all"]
+                        text = str[BUTTON_SELECT_ALL]
                     }
                     checkedTextView.findViewById<CheckBox>(R.id.ctv_checkbox).apply {
                         isChecked = checked
@@ -103,7 +105,7 @@ object Limits {
         })
 
         // Hook SelectContactUI to help the "Select All" button.
-        XposedHelpers.findAndHookMethod(
+        findAndHookMethod(
                 pkg.SelectContactUI, "onActivityResult",
                 C.Int, C.Int, C.Intent, object : XC_MethodHook() {
             @Throws(Throwable::class)
@@ -122,7 +124,7 @@ object Limits {
         })
 
         // Hook SelectContactUI to bypass the limit on number of recipients.
-        XposedHelpers.findAndHookMethod(
+        findAndHookMethod(
                 pkg.SelectContactUI, "onCreate",
                 C.Bundle, object : XC_MethodHook() {
             @Throws(Throwable::class)
@@ -137,13 +139,11 @@ object Limits {
 
     // Hook SelectConversationUI to bypass the limit on number of recipients.
     @JvmStatic fun breakSelectConversationLimit() {
-        if (pkg.SelectConversationUI == null || pkg.SelectConversationUIMaxLimitMethod == "") {
+        if (pkg.SelectConversationUI == null || pkg.SelectConversationUIMaxLimitMethod == null) {
             return
         }
 
-        XposedHelpers.findAndHookMethod(
-                pkg.SelectConversationUI, pkg.SelectConversationUIMaxLimitMethod,
-                C.Boolean, object : XC_MethodHook() {
+        findAndHookMethod(pkg.SelectConversationUI, pkg.SelectConversationUIMaxLimitMethod, object : XC_MethodHook() {
             @Throws(Throwable::class)
             override fun beforeHookedMethod(param: MethodHookParam) {
                 param.result = false

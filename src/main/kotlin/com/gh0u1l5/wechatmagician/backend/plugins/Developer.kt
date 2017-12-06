@@ -9,9 +9,11 @@ import com.gh0u1l5.wechatmagician.backend.WechatPackage
 import com.gh0u1l5.wechatmagician.storage.Preferences
 import com.gh0u1l5.wechatmagician.util.MessageUtil.argsToString
 import com.gh0u1l5.wechatmagician.util.MessageUtil.bundleToString
+import com.gh0u1l5.wechatmagician.util.PackageUtil.findAndHookMethod
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
+import de.robv.android.xposed.XposedBridge.hookAllMethods
+import de.robv.android.xposed.XposedBridge.log
+import de.robv.android.xposed.XposedHelpers.findAndHookMethod
 
 object Developer {
 
@@ -28,12 +30,12 @@ object Developer {
     // Hook View.onTouchEvent to trace touch events.
     @JvmStatic fun traceTouchEvents() {
         if (preferences!!.getBoolean("developer_ui_touch_event", false)) {
-            XposedHelpers.findAndHookMethod(
+            findAndHookMethod(
                     "android.view.View", loader,
                     "onTouchEvent", C.MotionEvent, object : XC_MethodHook() {
                 @Throws(Throwable::class)
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    XposedBridge.log("View.onTouchEvent => obj.class = ${param.thisObject.javaClass}")
+                    log("View.onTouchEvent => obj.class = ${param.thisObject.javaClass}")
                 }
             })
         }
@@ -42,31 +44,57 @@ object Developer {
     // Hook Activity.startActivity and Activity.onCreate to trace activities.
     @JvmStatic fun traceActivities() {
         if (preferences!!.getBoolean("developer_ui_trace_activities", false)) {
-            XposedHelpers.findAndHookMethod(
+            findAndHookMethod(
                     "android.app.Activity", loader,
                     "startActivity", C.Intent, object : XC_MethodHook() {
                 @Throws(Throwable::class)
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val intent = param.args[0] as Intent?
-                    XposedBridge.log("Activity.startActivity => " +
+                    log("Activity.startActivity => " +
                             "${param.thisObject.javaClass}, " +
                             "intent => ${bundleToString(intent?.extras)}")
                 }
             })
 
-            XposedHelpers.findAndHookMethod(
+            findAndHookMethod(
                     "android.app.Activity", loader,
                     "onCreate", C.Bundle, object : XC_MethodHook() {
                 @Throws(Throwable::class)
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val bundle = param.args[0] as Bundle?
                     val intent = (param.thisObject as Activity).intent
-                    XposedBridge.log("Activity.onCreate => " +
+                    log("Activity.onCreate => " +
                             "${param.thisObject.javaClass}, " +
                             "intent => ${bundleToString(intent?.extras)}, " +
                             "bundle => ${bundleToString(bundle)}")
                 }
             })
+        }
+    }
+
+    @JvmStatic fun traceLogCat() {
+        if (pkg.LogCat == null) {
+            return
+        }
+
+        if (preferences!!.getBoolean("developer_trace_logcat", false)) {
+            val functions = listOf("d", "e", "i", "v", "w")
+            functions.forEach { func ->
+                findAndHookMethod(
+                        pkg.LogCat, func,
+                        C.String, C.String, C.ObjectArray, object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val tag = param.args[0] as String
+                        val msg = param.args[1] as String
+                        val args = param.args[2] as Array<*>?
+                        if (args == null) {
+                            log("${func.toUpperCase()} $tag $msg")
+                        } else {
+                            log("${func.toUpperCase()} $tag ${msg.format(*args)}")
+                        }
+                    }
+                })
+            }
         }
     }
 
@@ -77,7 +105,7 @@ object Developer {
         }
 
         if (preferences!!.getBoolean("developer_ui_xlog", false)) {
-            XposedBridge.hookAllMethods(
+            hookAllMethods(
                     pkg.XLogSetup, "keep_setupXLog", object : XC_MethodHook() {
                 @Throws(Throwable::class)
                 override fun beforeHookedMethod(param: MethodHookParam) {
@@ -89,19 +117,17 @@ object Developer {
 
     // Hook XML Parser to trace the XML files used in Wechat.
     @JvmStatic fun traceXMLParse() {
-        if (pkg.XMLParserClass == null || pkg.XMLParseMethod == "") {
+        if (pkg.XMLParserClass == null || pkg.XMLParseMethod == null) {
             return
         }
 
         if (preferences!!.getBoolean("developer_xml_parser", false)) {
-            XposedHelpers.findAndHookMethod(
-                    pkg.XMLParserClass, pkg.XMLParseMethod,
-                    C.String, C.String, object : XC_MethodHook() {
+            findAndHookMethod(pkg.XMLParserClass, pkg.XMLParseMethod, object : XC_MethodHook() {
                 @Throws(Throwable::class)
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val xml = param.args[0] as String?
                     val tag = param.args[1] as String?
-                    XposedBridge.log("XML => xml = $xml, tag = $tag")
+                    log("XML => xml = $xml, tag = $tag")
                 }
             })
         }
@@ -110,40 +136,40 @@ object Developer {
     // Hook SQLiteDatabase to trace all the database operations.
     @JvmStatic fun traceDatabase() {
         when (null) {
-            pkg.SQLiteDatabaseClass,
+            pkg.SQLiteDatabase,
             pkg.SQLiteCursorFactory,
             pkg.SQLiteCancellationSignal -> return
         }
 
         if (preferences!!.getBoolean("developer_database_query", false)) {
-            XposedHelpers.findAndHookMethod(
-                    pkg.SQLiteDatabaseClass, "rawQueryWithFactory",
+            findAndHookMethod(
+                    pkg.SQLiteDatabase, "rawQueryWithFactory",
                     pkg.SQLiteCursorFactory, C.String, C.StringArray, C.String, pkg.SQLiteCancellationSignal, object : XC_MethodHook() {
                 @Throws(Throwable::class)
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val sql = param.args[1] as String?
                     val selectionArgs = param.args[2] as Array<*>?
-                    XposedBridge.log("DB => query sql = $sql, selectionArgs = ${argsToString(selectionArgs)}")
+                    log("DB => query sql = $sql, selectionArgs = ${argsToString(selectionArgs)}, db = ${param.thisObject}")
                 }
             })
         }
 
         if (preferences!!.getBoolean("developer_database_insert", false)) {
-            XposedHelpers.findAndHookMethod(
-                    pkg.SQLiteDatabaseClass, "insertWithOnConflict",
+            findAndHookMethod(
+                    pkg.SQLiteDatabase, "insertWithOnConflict",
                     C.String, C.String, C.ContentValues, C.Int, object : XC_MethodHook() {
                 @Throws(Throwable::class)
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val table = param.args[0] as String?
                     val values = param.args[2] as ContentValues?
-                    XposedBridge.log("DB => insert table = $table, values = $values")
+                    log("DB => insert table = $table, values = $values, db = ${param.thisObject}")
                 }
             })
         }
 
         if (preferences!!.getBoolean("developer_database_update", false)) {
-            XposedHelpers.findAndHookMethod(
-                    pkg.SQLiteDatabaseClass, "updateWithOnConflict",
+            findAndHookMethod(
+                    pkg.SQLiteDatabase, "updateWithOnConflict",
                     C.String, C.ContentValues, C.String, C.StringArray, C.Int, object : XC_MethodHook() {
                 @Throws(Throwable::class)
                 override fun beforeHookedMethod(param: MethodHookParam) {
@@ -151,41 +177,43 @@ object Developer {
                     val values = param.args[1] as ContentValues?
                     val whereClause = param.args[2] as String?
                     val whereArgs = param.args[3] as Array<*>?
-                    XposedBridge.log("DB => update " +
+                    log("DB => update " +
                             "table = $table, " +
                             "values = $values, " +
                             "whereClause = $whereClause, " +
-                            "whereArgs = ${argsToString(whereArgs)}")
+                            "whereArgs = ${argsToString(whereArgs)}, " +
+                            "db = ${param.thisObject}")
                 }
             })
         }
 
         if (preferences!!.getBoolean("developer_database_delete", false)) {
-            XposedHelpers.findAndHookMethod(
-                    pkg.SQLiteDatabaseClass, "delete",
+            findAndHookMethod(
+                    pkg.SQLiteDatabase, "delete",
                     C.String, C.String, C.StringArray, object : XC_MethodHook() {
                 @Throws(Throwable::class)
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val table = param.args[0] as String?
                     val whereClause = param.args[1] as String?
                     val whereArgs = param.args[2] as Array<*>?
-                    XposedBridge.log("DB => delete " +
+                    log("DB => delete " +
                             "table = $table, " +
                             "whereClause = $whereClause, " +
-                            "whereArgs = ${argsToString(whereArgs)}")
+                            "whereArgs = ${argsToString(whereArgs)}, " +
+                            "db = ${param.thisObject}")
                 }
             })
         }
 
         if (preferences!!.getBoolean("developer_database_execute", false)) {
-            XposedHelpers.findAndHookMethod(
-                    pkg.SQLiteDatabaseClass, "executeSql",
+            findAndHookMethod(
+                    pkg.SQLiteDatabase, "executeSql",
                     C.String, C.ObjectArray, pkg.SQLiteCancellationSignal, object : XC_MethodHook() {
                 @Throws(Throwable::class)
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val sql = param.args[0] as String?
                     val bindArgs = param.args[1] as Array<*>?
-                    XposedBridge.log("DB => executeSql sql = $sql, bindArgs = ${argsToString(bindArgs)}")
+                    log("DB => executeSql sql = $sql, bindArgs = ${argsToString(bindArgs)}, db = ${param.thisObject}")
                 }
             })
         }
