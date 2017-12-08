@@ -4,11 +4,13 @@ package com.gh0u1l5.wechatmagician.backend
 
 import android.content.Context
 import com.gh0u1l5.wechatmagician.C
+import com.gh0u1l5.wechatmagician.Global.WAIT_TIMEOUT
 import com.gh0u1l5.wechatmagician.Global.WECHAT_PACKAGE_NAME
 import com.gh0u1l5.wechatmagician.Version
 import com.gh0u1l5.wechatmagician.util.FileUtil
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findClassIfExists
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findClassesFromPackage
+import com.gh0u1l5.wechatmagician.util.PackageUtil.findFieldsWithGenericType
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findFieldsWithType
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findMethodsByExactParameters
 import de.robv.android.xposed.XposedBridge.log
@@ -17,226 +19,316 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 import net.dongliu.apk.parser.ApkFile
 import net.dongliu.apk.parser.bean.DexClass
 import java.io.File
-import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
+import kotlin.concurrent.thread
 import kotlin.concurrent.write
 
 // WechatPackage analyzes and stores critical classes and objects in Wechat application.
 // These classes and objects will be used for hooking and tampering with runtime data.
 object WechatPackage {
 
+    // isInitialized indicates whether the WechatPackage has been initialized.
+    private val initializeChannel = java.lang.Object()
+    @Volatile var isInitialized = false
+
     // status stores the working status of all the hooks.
     private val statusLock = ReentrantReadWriteLock()
     private val status: HashMap<String, Boolean> = hashMapOf()
 
-    var LogCat: Class<*>? = null
-    var XLogSetup: Class<*>? = null
-    var WebWXLoginUI: Class<*>? = null
-    var RemittanceAdapter: Class<*>? = null
-    var ActionBarEditText: Class<*>? = null
+    // These stores necessary information to match signatures.
+    @Volatile var loader: ClassLoader? = null
+    @Volatile var version: Version? = null
+    @Volatile var classes: Array<DexClass>? = null
 
-    var WXCustomScheme: Class<*>? = null
-    var WXCustomSchemeEntryMethod: Method? = null
+    fun <T> innerLazy(name: String, initializer: () -> T?): Lazy<T> = lazy {
+        synchronized(initializeChannel) {
+            if (!isInitialized) {
+                initializeChannel.wait(WAIT_TIMEOUT)
+            }
+        }
+        if (loader == null || version == null || classes == null) {
+            throw Error("Failed to evaluate $name: initialization failed.")
+        }
+        initializer() ?: throw Error("Failed to evaluate $name")
+    }
 
-    var EncEngine: Class<*>? = null
-    var EncEngineEDMethod: Method? = null
+    val WECHAT_PACKAGE_SQLITE: String by innerLazy("WECHAT_PACKAGE_SQLITE") {
+        when {
+            version!! >= Version("6.5.8") -> "com.tencent.wcdb"
+            else -> "com.tencent.mmdb"
+        }
+    }
+    val WECHAT_PACKAGE_UI: String         = "$WECHAT_PACKAGE_NAME.ui"
+    val WECHAT_PACKAGE_SNS_UI: String     = "$WECHAT_PACKAGE_NAME.plugin.sns.ui"
+    val WECHAT_PACKAGE_GALLERY_UI: String = "$WECHAT_PACKAGE_NAME.plugin.gallery.ui"
 
-    var SQLiteDatabasePkg = ""
-    var SQLiteDatabase: Class<*>? = null
-    var SQLiteCursorFactory: Class<*>? = null
-    var SQLiteErrorHandler: Class<*>? = null
-    var SQLiteCancellationSignal: Class<*>? = null
+    val LogCat: Class<*> by innerLazy("LogCat") {
+        findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_NAME.sdk.platformtools")
+                .filterByEnclosingClass(null)
+                .filterByMethod(C.Int, "getLogLevel")
+                .firstOrNull()
+    }
+    val XLogSetup: Class<*> by innerLazy("XLogSetup") {
+        findClassIfExists("$WECHAT_PACKAGE_NAME.xlog.app.XLogSetup", loader)
+    }
+    val WebWXLoginUI: Class<*> by innerLazy("WebWXLoginUI") {
+        findClassIfExists("$WECHAT_PACKAGE_NAME.plugin.webwx.ui.ExtDeviceWXLoginUI", loader)
+    }
+    val RemittanceAdapter: Class<*> by innerLazy("RemittanceAdapter") {
+        findClassIfExists("$WECHAT_PACKAGE_NAME.plugin.remittance.ui.RemittanceAdapterUI", loader)
+    }
+    val ActionBarEditText: Class<*> by innerLazy("ActionBarEditText") {
+        findClassIfExists("$WECHAT_PACKAGE_NAME.ui.tools.ActionBarSearchView.ActionBarEditText", loader)
+    }
 
-    var MMActivity: Class<*>? = null
-    var MMFragmentActivity: Class<*>? = null
-    var MMListPopupWindow: Class<*>? = null
+    val WXCustomScheme: Class<*> by innerLazy("WXCustomScheme") {
+        findClassIfExists("$WECHAT_PACKAGE_NAME.plugin.base.stub.WXCustomSchemeEntryActivity", loader)
+    }
+    val WXCustomSchemeEntryMethod: Method by innerLazy("WXCustomSchemeEntryMethod") {
+        findMethodsByExactParameters(WXCustomScheme, C.Boolean, C.Intent).firstOrNull()
+    }
 
-    var MMBaseAdapter: Class<*>? = null
-    var AddressAdapter: Class<*>? = null
-    var ConversationWithCacheAdapter: Class<*>? = null
+    val EncEngine: Class<*> by innerLazy("EncEngine") {
+        findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_NAME.modelsfs")
+                .filterByMethod(null, "seek", C.Long)
+                .filterByMethod(null, "free")
+                .firstOrNull()
+    }
+    val EncEngineEDMethod: Method by innerLazy("EncEngineEDMethod") {
+        findMethodsByExactParameters(EncEngine, C.Int, C.ByteArray, C.Int).firstOrNull()
+    }
 
-    var SnsActivity: Class<*>? = null
-    var SnsUploadUI: Class<*>? = null
-    var SnsUploadUIEditTextField: Field? = null
-    var SnsUserUI: Class<*>? = null
-    var SnsTimeLineUI: Class<*>? = null
+    val SQLiteDatabase: Class<*> by innerLazy("SQLiteDatabase") {
+        findClassIfExists("$WECHAT_PACKAGE_SQLITE.database.SQLiteDatabase", loader)
+    }
+    val SQLiteCursorFactory: Class<*> by innerLazy("SQLiteCursorFactory") {
+        findClassIfExists("$WECHAT_PACKAGE_SQLITE.database.SQLiteDatabase.CursorFactory", loader)
+    }
+    val SQLiteErrorHandler: Class<*> by innerLazy("SQLiteErrorHandler") {
+        findClassIfExists("$WECHAT_PACKAGE_SQLITE.DatabaseErrorHandler", loader)
+    }
+    val SQLiteCancellationSignal: Class<*> by innerLazy("SQLiteCancellationSignal") {
+        findClassIfExists("$WECHAT_PACKAGE_SQLITE.support.CancellationSignal", loader)
+    }
 
-    var AlbumPreviewUI: Class<*>? = null
-    var SelectContactUI: Class<*>? = null
-    var SelectConversationUI: Class<*>? = null
-    var SelectConversationUIMaxLimitMethod: Method? = null
+    val LauncherUI: Class<*> by innerLazy("LauncherUI") {
+        findClassIfExists("$WECHAT_PACKAGE_UI.LauncherUI", loader)
+    }
+    val MMActivity: Class<*> by innerLazy("MMActivity") {
+        findClassIfExists("$WECHAT_PACKAGE_UI.MMActivity", loader)
+    }
+    val MMFragmentActivity: Class<*> by innerLazy("MMFragmentActivity") {
+        findClassIfExists("$WECHAT_PACKAGE_UI.MMFragmentActivity", loader)
+    }
+    val MMListPopupWindow: Class<*> by innerLazy("MMListPopupWindow") {
+        findClassIfExists("$WECHAT_PACKAGE_UI.base.MMListPopupWindow", loader)
+    }
 
-    var MsgInfoClass: Class<*>? = null
-    var ContactInfoClass: Class<*>? = null
+    val MMBaseAdapter: Class<*> by innerLazy("MMBaseAdapter") {
+        val addressBase = AddressAdapter.superclass
+        val conversationBase = ConversationWithCacheAdapter.superclass
+        if (addressBase != conversationBase) {
+            log("Unexpected base adapter: $addressBase and $conversationBase")
+        }
+        return@innerLazy addressBase
+    }
+    val MMBaseAdapterGetMethod: String by innerLazy("MMBaseAdapterGetMethod") {
+        MMBaseAdapter.declaredMethods.filter {
+            it.parameterTypes.size == 1 && it.parameterTypes[0] == C.Int
+        }.firstOrNull {
+            it.name != "getItem" && it.name != "getItemId"
+        }?.name
+    }
+    val AddressAdapter: Class<*> by innerLazy("AddressAdapter") {
+        findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_UI.contact")
+                .filterByMethod(null, "pause")
+                .firstOrNull()
+    }
+    val ConversationWithCacheAdapter: Class<*> by innerLazy("ConversationWithCacheAdapter") {
+        findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_UI.conversation")
+                .filterByMethod(null, "clearCache")
+                .firstOrNull()
+    }
 
-    var MsgStorageClass: Class<*>? = null
-    var MsgStorageInsertMethod: Method? = null
+    val AddressUI: Class<*> by innerLazy("AddressUI") {
+        findClassIfExists("$WECHAT_PACKAGE_UI.contact.AddressUI.a", loader)
+    }
+    val ContactLongClickListener: Class<*> by innerLazy("ContactLongClickListener") {
+        findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_UI.contact")
+                .filterByEnclosingClass(AddressUI)
+                .filterByMethod(C.Boolean, "onItemLongClick", C.AdapterView, C.View, C.Int, C.Long)
+                .firstOrNull()
+    }
+    val MainUI: Class<*> by innerLazy("MainUI") {
+        findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_UI.conversation")
+                .filterByMethod(C.Int, "getLayoutId")
+                .filterByMethod(null, "onConfigurationChanged", C.Configuration)
+                .firstOrNull()
+    }
+    val ConversationLongClickListener: Class<*> by innerLazy("ConversationLongClickListener") {
+        when {
+            version!! >= Version("6.5.8") ->
+                findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_UI.conversation")
+                        .filterByMethod(null, "onCreateContextMenu", C.ContextMenu, C.View, C.ContextMenuInfo)
+                        .filterByMethod(C.Boolean, "onItemLongClick", C.AdapterView, C.View, C.Int, C.Long)
+                        .firstOrNull()
+            else ->
+                findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_UI.conversation")
+                        .filterByEnclosingClass(MainUI)
+                        .filterByMethod(C.Boolean, "onItemLongClick", C.AdapterView, C.View, C.Int, C.Long)
+                        .firstOrNull()
+        }
+    }
+    val ConversationCreateContextMenuListener: Class<*> by innerLazy("ConversationCreateContextMenuListener") {
+        when {
+            version!! >= Version("6.5.8") -> ConversationLongClickListener
+            else -> MainUI
+        }
+    }
+    val ChattingUI: Class<*> by innerLazy("ChattingUI") {
+        findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_UI.chatting")
+                .filterBySuper(MMFragmentActivity)
+                .filterByMethod(null, "onRequestPermissionsResult", C.Int, C.StringArray, C.IntArray)
+                .firstOrNull()
+    }
+
+    val SnsActivity: Class<*> by innerLazy("SnsActivity") {
+        findClassesFromPackage(loader!!, classes!!, WECHAT_PACKAGE_SNS_UI)
+                .filterByField("$WECHAT_PACKAGE_UI.base.MMPullDownView")
+                .firstOrNull()
+    }
+    val SnsUploadUI: Class<*> by innerLazy("SnsUploadUI") {
+        findClassesFromPackage(loader!!, classes!!, WECHAT_PACKAGE_SNS_UI)
+                .filterByField("$WECHAT_PACKAGE_SNS_UI.LocationWidget")
+                .filterByField("$WECHAT_PACKAGE_SNS_UI.SnsUploadSayFooter")
+                .firstOrNull()
+    }
+    val SnsUploadUIEditTextField: String by innerLazy("SnsUploadUIEditTextField") {
+        findFieldsWithType(
+                SnsUploadUI, "$WECHAT_PACKAGE_SNS_UI.SnsEditText"
+        ).firstOrNull()?.name ?: ""
+    }
+    val SnsUserUI: Class<*> by innerLazy("SnsUserUI") {
+        findClassIfExists("$WECHAT_PACKAGE_SNS_UI.SnsUserUI", loader)
+    }
+    val SnsTimeLineUI: Class<*> by innerLazy("SnsTimeLineUI") {
+        findClassesFromPackage(loader!!, classes!!, WECHAT_PACKAGE_SNS_UI)
+                .filterByField("android.support.v7.app.ActionBar")
+                .firstOrNull()
+    }
+
+    val AlbumPreviewUI: Class<*> by innerLazy("AlbumPreviewUI") {
+        findClassIfExists("$WECHAT_PACKAGE_GALLERY_UI.AlbumPreviewUI", loader)
+    }
+    val SelectContactUI: Class<*> by innerLazy("SelectContactUI") {
+        findClassIfExists("$WECHAT_PACKAGE_UI.contact.SelectContactUI", loader)
+    }
+    val SelectConversationUI: Class<*> by innerLazy("SelectConversationUI") {
+        findClassIfExists("$WECHAT_PACKAGE_UI.transmit.SelectConversationUI", loader)
+    }
+    val SelectConversationUIMaxLimitMethod: Method by innerLazy("SelectConversationUIMaxLimitMethod") {
+        findMethodsByExactParameters(SelectConversationUI, C.Boolean, C.Boolean).firstOrNull()
+    }
+
+    val MsgInfoClass: Class<*> by innerLazy("MsgInfoClass") {
+        findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_NAME.storage")
+                .filterByMethod(C.Boolean, "isSystem")
+                .firstOrNull()
+    }
+    val ContactInfoClass: Class<*> by innerLazy("ContactInfoClass") {
+        findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_NAME.storage")
+                .filterByMethod(C.String, "getCityCode")
+                .filterByMethod(C.String, "getCountryCode")
+                .firstOrNull()
+    }
+
     @Volatile var MsgStorageObject: Any? = null
+    val MsgStorageClass: Class<*> by innerLazy("MsgStorageClass") {
+        when {
+            version!! >= Version("6.5.8") ->
+                findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_NAME.storage")
+                        .filterByMethod(C.Long, MsgInfoClass, C.Boolean)
+                        .firstOrNull()
+            else ->
+                findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_NAME.storage")
+                        .filterByMethod(C.Long, MsgInfoClass)
+                        .firstOrNull()
+        }
+    }
+    val MsgStorageInsertMethod: Method by innerLazy("MsgStorageInsertMethod") {
+        when {
+            version!! >= Version("6.5.8") ->
+                findMethodsByExactParameters(
+                        MsgStorageClass, C.Long, MsgInfoClass, C.Boolean
+                ).firstOrNull()
+            else ->
+                findMethodsByExactParameters(
+                        MsgStorageClass, C.Long, MsgInfoClass
+                ).firstOrNull()
+        }
+    }
 
     val CacheMapClass = "$WECHAT_PACKAGE_NAME.a.f"
     val CacheMapPutMethod = "k"
 
-    var ImgStorageClass: Class<*>? = null
-    var ImgStorageCacheField = ""
-    val ImgStorageLoadMethod = "a"
     @Volatile var ImgStorageObject: Any? = null
+    val ImgStorageClass: Class<*> by innerLazy("ImgStorageClass") {
+        findClassesFromPackage(loader!!, classes!!, WECHAT_PACKAGE_NAME, 1)
+                .filterByMethod(C.String, ImgStorageLoadMethod, C.String, C.String, C.String, C.Boolean)
+                .firstOrNull()
+    }
+    val ImgStorageCacheField: String by innerLazy("ImgStorageCacheField") {
+        findFieldsWithGenericType(
+                ImgStorageClass, "$CacheMapClass<java.lang.String, android.graphics.Bitmap>"
+        ).firstOrNull()?.name ?: ""
+    }
+    val ImgStorageLoadMethod = "a"
 
-    var XMLParserClass: Class<*>? = null
-    var XMLParseMethod: Method? = null
-
-    // Analyzes Wechat package statically for the name of classes.
-    // WechatHook will do the runtime analysis and set the objects.
-    fun init(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val loader = lpparam.classLoader
-        val version = getVersion(lpparam)
-
-        var apkFile: ApkFile? = null
-        val classes: Array<DexClass>
-        try {
-            apkFile = ApkFile(lpparam.appInfo.sourceDir)
-            classes = apkFile.dexClasses
-        } finally {
-            apkFile?.close()
-        }
-
-
-        LogCat = findClassesFromPackage(loader, classes, "$WECHAT_PACKAGE_NAME.sdk.platformtools")
-                .filterByMethod(null, "printErrStackTrace", C.String, C.Throwable, C.String, C.ObjectArray)
-                .firstOrNull("LogCat")
-        XLogSetup = findClassIfExists(
-                "$WECHAT_PACKAGE_NAME.xlog.app.XLogSetup", loader)
-        WebWXLoginUI = findClassIfExists(
-                "$WECHAT_PACKAGE_NAME.plugin.webwx.ui.ExtDeviceWXLoginUI", loader)
-        RemittanceAdapter = findClassIfExists(
-                "$WECHAT_PACKAGE_NAME.plugin.remittance.ui.RemittanceAdapterUI", loader)
-        ActionBarEditText = findClassIfExists(
-                "$WECHAT_PACKAGE_NAME.ui.tools.ActionBarSearchView.ActionBarEditText", loader)
-
-        WXCustomScheme = findClassIfExists(
-                "$WECHAT_PACKAGE_NAME.plugin.base.stub.WXCustomSchemeEntryActivity", loader)
-        WXCustomSchemeEntryMethod = findMethodsByExactParameters(
-                WXCustomScheme, C.Boolean, C.Intent
-        ).firstOrNull()
-
-        EncEngine = findClassesFromPackage(loader, classes, "$WECHAT_PACKAGE_NAME.modelsfs")
-                .filterByMethod(null, "seek", C.Long)
-                .filterByMethod(null, "free")
-                .firstOrNull("EncEngine")
-        EncEngineEDMethod = findMethodsByExactParameters(
-                EncEngine, C.Int, C.ByteArray, C.Int
-        ).firstOrNull()
-
-
-        SQLiteDatabasePkg = when {
-            version >= Version("6.5.8") -> "com.tencent.wcdb"
-            else -> "com.tencent.mmdb"
-        }
-        SQLiteDatabase = findClassIfExists(
-                "$SQLiteDatabasePkg.database.SQLiteDatabase", loader)
-        SQLiteCursorFactory = findClassIfExists(
-                "$SQLiteDatabasePkg.database.SQLiteDatabase.CursorFactory", loader)
-        SQLiteErrorHandler = findClassIfExists(
-                "$SQLiteDatabasePkg.DatabaseErrorHandler", loader)
-        SQLiteCancellationSignal = findClassIfExists(
-                "$SQLiteDatabasePkg.support.CancellationSignal", loader)
-
-
-        val pkgUI = "$WECHAT_PACKAGE_NAME.ui"
-        MMActivity = findClassIfExists("$pkgUI.MMActivity", loader)
-        MMFragmentActivity = findClassIfExists("$pkgUI.MMFragmentActivity", loader)
-        MMListPopupWindow = findClassIfExists("$pkgUI.base.MMListPopupWindow", loader)
-
-
-        AddressAdapter = findClassesFromPackage(loader, classes, "$pkgUI.contact")
-                .filterByMethod(null, "pause")
-                .firstOrNull("AddressAdapter")
-        ConversationWithCacheAdapter = findClassesFromPackage(loader, classes, "$pkgUI.conversation")
-                .filterByMethod(null, "clearCache")
-                .firstOrNull("ConversationWithCacheAdapter")
-        if (AddressAdapter != null && ConversationWithCacheAdapter != null) {
-            if (AddressAdapter?.superclass != ConversationWithCacheAdapter?.superclass) {
-                log("Unexpected base adapter: ${AddressAdapter?.superclass} and ${ConversationWithCacheAdapter?.superclass}")
-            }
-            MMBaseAdapter = AddressAdapter?.superclass
-        }
-
-
-        val pkgSnsUI = "$WECHAT_PACKAGE_NAME.plugin.sns.ui"
-        val snsUIClasses = findClassesFromPackage(loader, classes, pkgSnsUI)
-        SnsActivity = snsUIClasses
-                .filterByField("$pkgUI.base.MMPullDownView")
-                .firstOrNull("SnsActivity")
-        SnsUploadUI = snsUIClasses
-                .filterByField("$pkgSnsUI.LocationWidget")
-                .filterByField("$pkgSnsUI.SnsUploadSayFooter")
-                .firstOrNull("SnsUploadUI")
-        SnsUploadUIEditTextField = findFieldsWithType(
-                SnsUploadUI, "$pkgSnsUI.SnsEditText"
-        ).firstOrNull()
-        SnsUserUI = findClassIfExists("$pkgSnsUI.SnsUserUI", loader)
-        SnsTimeLineUI = snsUIClasses
-                .filterByField("android.support.v7.app.ActionBar")
-                .firstOrNull("SnsTimeLineUI")
-
-
-        val pkgGalleryUI = "$WECHAT_PACKAGE_NAME.plugin.gallery.ui"
-        AlbumPreviewUI = findClassIfExists("$pkgGalleryUI.AlbumPreviewUI", loader)
-        SelectContactUI = findClassIfExists("$pkgUI.contact.SelectContactUI", loader)
-        SelectConversationUI = findClassIfExists("$pkgUI.transmit.SelectConversationUI", loader)
-        SelectConversationUIMaxLimitMethod = findMethodsByExactParameters(
-                SelectConversationUI, C.Boolean, C.Boolean
-        ).firstOrNull()
-
-
-        val storageClasses = findClassesFromPackage(loader, classes, "$WECHAT_PACKAGE_NAME.storage")
-        MsgInfoClass = storageClasses
-                .filterByMethod(C.Boolean, "isSystem")
-                .firstOrNull("MsgInfoClass")
-        ContactInfoClass = storageClasses
-                .filterByMethod(C.String, "getCityCode")
-                .filterByMethod(C.String, "getCountryCode")
-                .firstOrNull("ContactInfoClass")
-
-        if (MsgInfoClass != null) {
-            MsgStorageClass = when {
-                version >= Version("6.5.8") ->
-                    storageClasses
-                            .filterByMethod(C.Long, MsgInfoClass!!, C.Boolean)
-                            .firstOrNull("MsgStorageClass")
-                else ->
-                    storageClasses
-                            .filterByMethod(C.Long, MsgInfoClass!!)
-                            .firstOrNull("MsgStorageClass")
-            }
-            MsgStorageInsertMethod = when {
-                version >= Version("6.5.8") ->
-                    findMethodsByExactParameters(
-                        MsgStorageClass, C.Long, MsgInfoClass!!, C.Boolean
-                    ).firstOrNull()
-                else ->
-                    findMethodsByExactParameters(
-                        MsgStorageClass, C.Long, MsgInfoClass!!
-                    ).firstOrNull()
-            }
-        }
-
-//        ImgStorageClass = findClassesFromPackage(loader, classes, WECHAT_PACKAGE_NAME, 1)
-//                .filterByMethod(C.String, ImgStorageLoadMethod, C.String, C.String, C.String, C.Boolean)
-//                .firstOrNull("ImgStorageClass")
-//        ImgStorageCacheField = findFieldsWithGenericType(
-//                ImgStorageClass, "$CacheMapClass<java.lang.String, android.graphics.Bitmap>"
-//        ).firstOrNull()?.name ?: ""
-
-
-        val platformClasses = findClassesFromPackage(loader, classes,"$WECHAT_PACKAGE_NAME.sdk.platformtools")
-        XMLParserClass = platformClasses
+    val XMLParserClass: Class<*> by innerLazy("XMLParserClass") {
+        findClassesFromPackage(loader!!, classes!!,"$WECHAT_PACKAGE_NAME.sdk.platformtools")
                 .filterByMethod(C.Map, C.String, C.String)
-                .firstOrNull("XMLParserClass")
-        XMLParseMethod = findMethodsByExactParameters(
+                .firstOrNull()
+    }
+    val XMLParseMethod: Method by innerLazy("XMLParseMethod") {
+        findMethodsByExactParameters(
                 XMLParserClass, C.Map, C.String, C.String
         ).firstOrNull()
+    }
+
+    // init initializes necessary information for static analysis.
+    fun init(lpparam: XC_LoadPackage.LoadPackageParam) {
+        thread(start = true) {
+            try {
+                loader = lpparam.classLoader
+                version = getVersion(lpparam)
+
+                var apkFile: ApkFile? = null
+                try {
+                    apkFile = ApkFile(lpparam.appInfo.sourceDir)
+                    classes = apkFile.dexClasses
+                } finally {
+                    apkFile?.close()
+                }
+
+                // NOTE: Since 6.5.16, Wechat loads multiple DEX asynchronously using
+                // a service called DexOptService. So we need to wait for MultiDex
+                // installation to continue.
+                if (version!! >= Version("6.5.16")) {
+                    // Keep waiting until the oracle is loaded into the given class loader.
+                    val oracle = "android.support.v4.os.ResultReceiver"
+                    while (findClassIfExists(oracle, loader) == null);
+                }
+            } finally {
+                synchronized(initializeChannel) {
+                    isInitialized = true
+                    initializeChannel.notifyAll()
+                }
+            }
+        }.setUncaughtExceptionHandler { _, throwable ->
+            log(throwable)
+        }
     }
 
     // getVersion returns the version of current package / application

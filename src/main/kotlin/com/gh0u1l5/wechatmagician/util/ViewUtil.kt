@@ -13,9 +13,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ListView
 import android.widget.Toast
+import com.gh0u1l5.wechatmagician.C
 import com.gh0u1l5.wechatmagician.Global
+import com.gh0u1l5.wechatmagician.backend.WechatPackage
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
+import de.robv.android.xposed.XposedHelpers.findFirstFieldByExactType
 
 // ViewUtil is a helper object for debugging / handling UI operations.
 object ViewUtil {
@@ -88,6 +91,7 @@ object ViewUtil {
     }
 
     // Resources.getDefaultLanguage returns current default language for the given resources
+    @Suppress("DEPRECATION")
     fun Resources.getDefaultLanguage(): String {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             configuration.locales[0]
@@ -106,5 +110,17 @@ object ViewUtil {
         } else {
             getChildAt(position - firstItemPosition)
         }
+    }
+
+    // getListViewFromSnsActivity takes the ListView of a SnsActivity out of its container.
+    fun getListViewFromSnsActivity(container: Any?): ListView? {
+        if (container == null) {
+            return null
+        }
+
+        val activityField = findFirstFieldByExactType(container.javaClass, WechatPackage.SnsActivity)
+        val activity = activityField.get(container)
+        val listViewField = findFirstFieldByExactType(activity.javaClass, C.ListView)
+        return listViewField.get(activity) as ListView
     }
 }

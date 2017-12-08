@@ -5,13 +5,14 @@ import android.view.Gravity
 import android.view.View
 import android.widget.*
 import com.gh0u1l5.wechatmagician.C
+import com.gh0u1l5.wechatmagician.backend.plugins.SnsForward.ForwardAsyncTask
 import com.gh0u1l5.wechatmagician.frontend.wechat.ListPopupAdapter
 import com.gh0u1l5.wechatmagician.frontend.wechat.ListPopupPosition
-import com.gh0u1l5.wechatmagician.storage.Strings
-import com.gh0u1l5.wechatmagician.storage.Strings.MENU_SNS_FORWARD
-import com.gh0u1l5.wechatmagician.storage.Strings.MENU_SNS_SCREENSHOT
-import com.gh0u1l5.wechatmagician.storage.Strings.PROMPT_SCREENSHOT
-import com.gh0u1l5.wechatmagician.storage.Strings.PROMPT_WAIT
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.MENU_SNS_FORWARD
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.MENU_SNS_SCREENSHOT
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.PROMPT_SCREENSHOT
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.PROMPT_WAIT
 import com.gh0u1l5.wechatmagician.util.FileUtil
 import com.gh0u1l5.wechatmagician.util.ImageUtil
 import com.gh0u1l5.wechatmagician.util.ViewUtil
@@ -21,15 +22,11 @@ import java.lang.reflect.Field
 
 object WechatEvents {
 
-    private val str = Strings
+    private val str = LocalizedStrings
     private val pkg = WechatPackage
 
     // Handle the logic about "select all" check box in SelectContactUI
     fun onSelectContactUISelectAll(activity: Activity, isChecked: Boolean) {
-        if (pkg.ContactInfoClass == null) {
-            return
-        }
-
         val intent = activity.intent ?: return
         intent.putExtra("select_all_checked", isChecked)
         intent.putExtra("already_select_contact", "")
@@ -48,7 +45,7 @@ object WechatEvents {
 
                 if (contactField == null) {
                     contactField = item.javaClass.fields.firstOrNull {
-                        it.type.name == pkg.ContactInfoClass?.name
+                        it.type.name == pkg.ContactInfoClass.name
                     } ?: return@next
                 }
                 val contact = contactField?.get(item) ?: return@next
@@ -85,7 +82,7 @@ object WechatEvents {
             }
 
             // Set general properties for popup window
-            width = parent.context.dp2px(100)
+            width = parent.context.dp2px(120)
             setDropDownGravity(Gravity.CENTER)
             setAdapter(ListPopupAdapter(view.context, operations))
             setOnItemClickListener { _, _, operation, _ ->

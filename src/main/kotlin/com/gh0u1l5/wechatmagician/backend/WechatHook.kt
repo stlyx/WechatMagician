@@ -28,7 +28,7 @@ class WechatHook : IXposedHookLoadPackage {
     // NOTE: Hooking Application.attach is necessary because Android 4.X is not supporting
     //       multi-dex applications natively. More information are available in this link:
     //       https://github.com/rovo89/xposedbridge/issues/30
-    inline private fun hookApplicationAttach(loader: ClassLoader, crossinline callback: (Context) -> Unit) {
+    private inline fun hookApplicationAttach(loader: ClassLoader, crossinline callback: (Context) -> Unit) {
         findAndHookMethod("android.app.Application",loader, "attach", C.Context, object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
                 callback(param.thisObject as Context)
@@ -36,8 +36,12 @@ class WechatHook : IXposedHookLoadPackage {
         })
     }
 
-    inline private fun tryHook(hook: () -> Unit) {
-        try { hook() } catch (e: Throwable) { log(e) }
+    private inline fun tryHook(crossinline hook: () -> Unit) {
+        thread(start = true) {
+            hook()
+        }.setUncaughtExceptionHandler { _, throwable ->
+            log(throwable)
+        }
     }
 
     // NOTE: Remember to catch all the exceptions here, otherwise you may get boot loop.
@@ -53,13 +57,7 @@ class WechatHook : IXposedHookLoadPackage {
                     })
                 WECHAT_PACKAGE_NAME ->
                     hookApplicationAttach(lpparam.classLoader, { context ->
-                        thread(start = true) {
-                            // NOTE: Since 6.5.16, Wechat loads multiple DEX asynchronously using
-                            // a service called DexOptService. So we need to sleep a while, wait
-                            // for MultiDex installation.
-                            sleep(500)
-                            handleLoadWechat(lpparam, context)
-                        }
+                        handleLoadWechat(lpparam, context)
                     })
             }
         } catch (e: Throwable) { log(e) }
@@ -77,10 +75,11 @@ class WechatHook : IXposedHookLoadPackage {
         pluginDeveloper.init(loader, developer)
         tryHook(pluginDeveloper::traceTouchEvents)
         tryHook(pluginDeveloper::traceActivities)
-        tryHook(pluginDeveloper::traceLogCat)
+        tryHook(pluginDeveloper::dumpPopupMenu)
         tryHook(pluginDeveloper::enableXLog)
-        tryHook(pluginDeveloper::traceXMLParse)
         tryHook(pluginDeveloper::traceDatabase)
+        tryHook(pluginDeveloper::traceLogCat)
+        tryHook(pluginDeveloper::traceXMLParse)
 
         val pluginAutoLogin = AutoLogin
         pluginAutoLogin.init(settings)
@@ -96,10 +95,12 @@ class WechatHook : IXposedHookLoadPackage {
         tryHook(pluginSnsForward::cleanTextViewBeforeForwarding)
 
         val pluginSecretFriend = SecretFriend
-        pluginSecretFriend.init(settings)
+        pluginSecretFriend.init(loader, settings)
+        tryHook(pluginSecretFriend::addHideOptionInPopupMenu)
         tryHook(pluginSecretFriend::tamperAdapterCount)
         tryHook(pluginSecretFriend::hideSecretFriend)
         tryHook(pluginSecretFriend::hideSecretFriendConversation)
+        tryHook(pluginSecretFriend::hideSecretFriendChattingWindow)
 
         val pluginLimits = Limits
         pluginLimits.init(settings)
@@ -109,7 +110,7 @@ class WechatHook : IXposedHookLoadPackage {
 
         val pluginStorage = Storage
         tryHook(pluginStorage::hookMsgStorage)
-        tryHook(pluginStorage::hookImgStorage)
+//        tryHook(pluginStorage::hookImgStorage)
 
         val pluginXML = XML
         pluginXML.init(settings)
@@ -127,9 +128,12 @@ class WechatHook : IXposedHookLoadPackage {
         tryHook(pluginSearchBar::hijackSearchBar)
 
         thread(start = true) {
+            sleep(10000) // Wait 10 seconds for hooking
             val wechatDataDir = getApplicationDataDir(context)
             val magicianDataDir = wechatDataDir.replace(WECHAT_PACKAGE_NAME, MAGICIAN_PACKAGE_NAME)
             WechatPackage.writeStatus("$magicianDataDir/$FOLDER_SHARED/status")
+        }.setUncaughtExceptionHandler { _, throwable ->
+            log(throwable)
         }
     }
 }

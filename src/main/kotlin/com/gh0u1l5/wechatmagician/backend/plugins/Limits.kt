@@ -8,13 +8,14 @@ import android.view.MenuItem
 import android.widget.CheckBox
 import android.widget.TextView
 import com.gh0u1l5.wechatmagician.C
+import com.gh0u1l5.wechatmagician.Global.SETTINGS_SELECT_PHOTOS_LIMIT
 import com.gh0u1l5.wechatmagician.R
 import com.gh0u1l5.wechatmagician.backend.WechatEvents
 import com.gh0u1l5.wechatmagician.backend.WechatPackage
 import com.gh0u1l5.wechatmagician.backend.WechatResHook
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.BUTTON_SELECT_ALL
 import com.gh0u1l5.wechatmagician.storage.Preferences
-import com.gh0u1l5.wechatmagician.storage.Strings
-import com.gh0u1l5.wechatmagician.storage.Strings.BUTTON_SELECT_ALL
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findAndHookMethod
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedHelpers.findAndHookMethod
@@ -27,16 +28,12 @@ object Limits {
         preferences = _preferences
     }
 
-    private val str = Strings
+    private val str = LocalizedStrings
     private val pkg = WechatPackage
     private val events = WechatEvents
 
     // Hook AlbumPreviewUI to bypass the limit on number of selected photos.
     @JvmStatic fun breakSelectPhotosLimit() {
-        if (pkg.AlbumPreviewUI == null) {
-            return
-        }
-
         findAndHookMethod(
                 pkg.AlbumPreviewUI, "onCreate",
                 C.Bundle, object : XC_MethodHook() {
@@ -46,7 +43,7 @@ object Limits {
                 val current = intent.getIntExtra("max_select_count", 9)
                 val limit = try {
                     preferences!!.getString(
-                            "settings_select_photos_limit", "1000"
+                            SETTINGS_SELECT_PHOTOS_LIMIT, "1000"
                     ).toInt()
                 } catch (_: Throwable) { 1000 }
                 if (current <= 9) {
@@ -57,10 +54,6 @@ object Limits {
     }
 
     @JvmStatic fun breakSelectContactLimit() {
-        if (pkg.MMActivity == null || pkg.SelectContactUI == null) {
-            return
-        }
-
         // Hook MMActivity.onCreateOptionsMenu to add "Select All" button.
         findAndHookMethod(
                 pkg.MMActivity, "onCreateOptionsMenu",
@@ -139,10 +132,6 @@ object Limits {
 
     // Hook SelectConversationUI to bypass the limit on number of recipients.
     @JvmStatic fun breakSelectConversationLimit() {
-        if (pkg.SelectConversationUI == null || pkg.SelectConversationUIMaxLimitMethod == null) {
-            return
-        }
-
         findAndHookMethod(pkg.SelectConversationUI, pkg.SelectConversationUIMaxLimitMethod, object : XC_MethodHook() {
             @Throws(Throwable::class)
             override fun beforeHookedMethod(param: MethodHookParam) {

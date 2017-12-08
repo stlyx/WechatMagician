@@ -4,15 +4,26 @@ import android.app.Activity
 import android.content.ContentValues
 import android.content.Intent
 import android.os.Bundle
+import android.widget.ListAdapter
 import com.gh0u1l5.wechatmagician.C
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_DELETE
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_EXECUTE
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_INSERT
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_QUERY
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_UPDATE
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_TRACE_LOGCAT
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_UI_DUMP_POPUP_MENU
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_UI_TOUCH_EVENT
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_UI_TRACE_ACTIVITIES
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_UI_XLOG
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_XML_PARSER
 import com.gh0u1l5.wechatmagician.backend.WechatPackage
 import com.gh0u1l5.wechatmagician.storage.Preferences
 import com.gh0u1l5.wechatmagician.util.MessageUtil.argsToString
 import com.gh0u1l5.wechatmagician.util.MessageUtil.bundleToString
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findAndHookMethod
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge.hookAllMethods
-import de.robv.android.xposed.XposedBridge.log
+import de.robv.android.xposed.XposedBridge.*
 import de.robv.android.xposed.XposedHelpers.findAndHookMethod
 
 object Developer {
@@ -29,7 +40,7 @@ object Developer {
 
     // Hook View.onTouchEvent to trace touch events.
     @JvmStatic fun traceTouchEvents() {
-        if (preferences!!.getBoolean("developer_ui_touch_event", false)) {
+        if (preferences!!.getBoolean(DEVELOPER_UI_TOUCH_EVENT, false)) {
             findAndHookMethod(
                     "android.view.View", loader,
                     "onTouchEvent", C.MotionEvent, object : XC_MethodHook() {
@@ -43,7 +54,7 @@ object Developer {
 
     // Hook Activity.startActivity and Activity.onCreate to trace activities.
     @JvmStatic fun traceActivities() {
-        if (preferences!!.getBoolean("developer_ui_trace_activities", false)) {
+        if (preferences!!.getBoolean(DEVELOPER_UI_TRACE_ACTIVITIES, false)) {
             findAndHookMethod(
                     "android.app.Activity", loader,
                     "startActivity", C.Intent, object : XC_MethodHook() {
@@ -72,39 +83,38 @@ object Developer {
         }
     }
 
-    @JvmStatic fun traceLogCat() {
-        if (pkg.LogCat == null) {
-            return
-        }
+    // Hook MMListPopupWindow to trace every popup menu.
+    @JvmStatic fun dumpPopupMenu() {
+        if (preferences!!.getBoolean(DEVELOPER_UI_DUMP_POPUP_MENU, false)) {
+            hookAllConstructors(pkg.MMListPopupWindow, object : XC_MethodHook() {
+                @Throws(Throwable::class)
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val menu = param.thisObject
+                    val context = param.args[0]
+                    log("POPUP => menu.class = ${menu.javaClass}")
+                    log("POPUP => context.class = ${context.javaClass}")
+                }
+            })
 
-        if (preferences!!.getBoolean("developer_trace_logcat", false)) {
-            val functions = listOf("d", "e", "i", "v", "w")
-            functions.forEach { func ->
-                findAndHookMethod(
-                        pkg.LogCat, func,
-                        C.String, C.String, C.ObjectArray, object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        val tag = param.args[0] as String
-                        val msg = param.args[1] as String
-                        val args = param.args[2] as Array<*>?
-                        if (args == null) {
-                            log("${func.toUpperCase()} $tag $msg")
-                        } else {
-                            log("${func.toUpperCase()} $tag ${msg.format(*args)}")
-                        }
+            findAndHookMethod(
+                    pkg.MMListPopupWindow, "setAdapter",
+                    C.ListAdapter, object : XC_MethodHook() {
+                @Throws(Throwable::class)
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val adapter = param.args[0] as ListAdapter? ?: return
+                    log("POPUP => adapter.count = ${adapter.count}")
+                    (0 until adapter.count).forEach { index ->
+                        log("POPUP => adapter.item[$index] = ${adapter.getItem(index)}")
+                        log("POPUP => adapter.item[$index].class = ${adapter.getItem(index).javaClass}")
                     }
-                })
-            }
+                }
+            })
         }
     }
 
     // Hook XLog to print internal errors into logcat.
     @JvmStatic fun enableXLog() {
-        if (pkg.XLogSetup == null) {
-            return
-        }
-
-        if (preferences!!.getBoolean("developer_ui_xlog", false)) {
+        if (preferences!!.getBoolean(DEVELOPER_UI_XLOG, false)) {
             hookAllMethods(
                     pkg.XLogSetup, "keep_setupXLog", object : XC_MethodHook() {
                 @Throws(Throwable::class)
@@ -115,33 +125,9 @@ object Developer {
         }
     }
 
-    // Hook XML Parser to trace the XML files used in Wechat.
-    @JvmStatic fun traceXMLParse() {
-        if (pkg.XMLParserClass == null || pkg.XMLParseMethod == null) {
-            return
-        }
-
-        if (preferences!!.getBoolean("developer_xml_parser", false)) {
-            findAndHookMethod(pkg.XMLParserClass, pkg.XMLParseMethod, object : XC_MethodHook() {
-                @Throws(Throwable::class)
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    val xml = param.args[0] as String?
-                    val tag = param.args[1] as String?
-                    log("XML => xml = $xml, tag = $tag")
-                }
-            })
-        }
-    }
-
     // Hook SQLiteDatabase to trace all the database operations.
     @JvmStatic fun traceDatabase() {
-        when (null) {
-            pkg.SQLiteDatabase,
-            pkg.SQLiteCursorFactory,
-            pkg.SQLiteCancellationSignal -> return
-        }
-
-        if (preferences!!.getBoolean("developer_database_query", false)) {
+        if (preferences!!.getBoolean(DEVELOPER_DATABASE_QUERY, false)) {
             findAndHookMethod(
                     pkg.SQLiteDatabase, "rawQueryWithFactory",
                     pkg.SQLiteCursorFactory, C.String, C.StringArray, C.String, pkg.SQLiteCancellationSignal, object : XC_MethodHook() {
@@ -154,7 +140,7 @@ object Developer {
             })
         }
 
-        if (preferences!!.getBoolean("developer_database_insert", false)) {
+        if (preferences!!.getBoolean(DEVELOPER_DATABASE_INSERT, false)) {
             findAndHookMethod(
                     pkg.SQLiteDatabase, "insertWithOnConflict",
                     C.String, C.String, C.ContentValues, C.Int, object : XC_MethodHook() {
@@ -167,7 +153,7 @@ object Developer {
             })
         }
 
-        if (preferences!!.getBoolean("developer_database_update", false)) {
+        if (preferences!!.getBoolean(DEVELOPER_DATABASE_UPDATE, false)) {
             findAndHookMethod(
                     pkg.SQLiteDatabase, "updateWithOnConflict",
                     C.String, C.ContentValues, C.String, C.StringArray, C.Int, object : XC_MethodHook() {
@@ -187,7 +173,7 @@ object Developer {
             })
         }
 
-        if (preferences!!.getBoolean("developer_database_delete", false)) {
+        if (preferences!!.getBoolean(DEVELOPER_DATABASE_DELETE, false)) {
             findAndHookMethod(
                     pkg.SQLiteDatabase, "delete",
                     C.String, C.String, C.StringArray, object : XC_MethodHook() {
@@ -205,7 +191,7 @@ object Developer {
             })
         }
 
-        if (preferences!!.getBoolean("developer_database_execute", false)) {
+        if (preferences!!.getBoolean(DEVELOPER_DATABASE_EXECUTE, false)) {
             findAndHookMethod(
                     pkg.SQLiteDatabase, "executeSql",
                     C.String, C.ObjectArray, pkg.SQLiteCancellationSignal, object : XC_MethodHook() {
@@ -214,6 +200,43 @@ object Developer {
                     val sql = param.args[0] as String?
                     val bindArgs = param.args[1] as Array<*>?
                     log("DB => executeSql sql = $sql, bindArgs = ${argsToString(bindArgs)}, db = ${param.thisObject}")
+                }
+            })
+        }
+    }
+
+    // Hook Log to trace hidden logcat output.
+    @JvmStatic fun traceLogCat() {
+        if (preferences!!.getBoolean(DEVELOPER_TRACE_LOGCAT, false)) {
+            val functions = listOf("d", "e", "f", "i", "v", "w")
+            functions.forEach { func ->
+                findAndHookMethod(
+                        pkg.LogCat, func,
+                        C.String, C.String, C.ObjectArray, object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val tag = param.args[0] as String
+                        val msg = param.args[1] as String
+                        val args = param.args[2] as Array<*>?
+                        if (args == null) {
+                            log("LOG.${func.toUpperCase()} => [$tag] $msg")
+                        } else {
+                            log("LOG.${func.toUpperCase()} => [$tag] ${msg.format(*args)}")
+                        }
+                    }
+                })
+            }
+        }
+    }
+
+    // Hook XML Parser to trace the XML files used in Wechat.
+    @JvmStatic fun traceXMLParse() {
+        if (preferences!!.getBoolean(DEVELOPER_XML_PARSER, false)) {
+            findAndHookMethod(pkg.XMLParserClass, pkg.XMLParseMethod, object : XC_MethodHook() {
+                @Throws(Throwable::class)
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val xml = param.args[0] as String?
+                    val tag = param.args[1] as String?
+                    log("XML => xml = $xml, tag = $tag")
                 }
             })
         }

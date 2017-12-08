@@ -9,19 +9,19 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
 import com.gh0u1l5.wechatmagician.Global.SALT
-import com.gh0u1l5.wechatmagician.storage.Strings
-import com.gh0u1l5.wechatmagician.storage.Strings.BUTTON_CANCEL
-import com.gh0u1l5.wechatmagician.storage.Strings.BUTTON_OK
-import com.gh0u1l5.wechatmagician.storage.Strings.PROMPT_CORRECT_PASSWORD
-import com.gh0u1l5.wechatmagician.storage.Strings.PROMPT_NEW_PASSWORD
-import com.gh0u1l5.wechatmagician.storage.Strings.PROMPT_VERIFY_PASSWORD
-import com.gh0u1l5.wechatmagician.storage.Strings.PROMPT_WRONG_PASSWORD
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.BUTTON_CANCEL
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.BUTTON_OK
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.PROMPT_CORRECT_PASSWORD
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.PROMPT_NEW_PASSWORD
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.PROMPT_VERIFY_PASSWORD
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.PROMPT_WRONG_PASSWORD
 import com.gh0u1l5.wechatmagician.util.ViewUtil.dp2px
 import java.security.MessageDigest
 
 object PasswordUtil {
 
-    private val str = Strings
+    private val str = LocalizedStrings
 
     private fun encryptPassword(password: String): String = MessageDigest
             .getInstance("SHA-256")
@@ -84,20 +84,21 @@ object PasswordUtil {
         }
     }
 
-    fun createPassword(context: Context, title: String, preferences: SharedPreferences, key: String) {
+    fun createPassword(context: Context, title: String, preferences: SharedPreferences, key: String, onFinish: (String) -> Unit = {}) {
         val message = str[PROMPT_NEW_PASSWORD]
         askPassword(context, title, message) { input ->
             preferences.edit()
                     .putString(key, encryptPassword(input))
                     .apply()
+            onFinish(input)
         }
     }
 
-    fun changePassword(context: Context, title: String, preferences: SharedPreferences, key: String) {
+    fun changePassword(context: Context, title: String, preferences: SharedPreferences, key: String, onFinish: (String) -> Unit = {}) {
         val message = str[PROMPT_VERIFY_PASSWORD]
         val encrypted = preferences.getString(key, "")
         askPasswordWithVerify(context, title, message, encrypted) {
-            createPassword(context, title, preferences, key)
+            createPassword(context, title, preferences, key, onFinish)
         }
     }
 }

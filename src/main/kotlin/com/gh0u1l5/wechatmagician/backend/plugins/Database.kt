@@ -6,11 +6,14 @@ import android.app.NotificationManager
 import android.content.ContentValues
 import android.content.Context
 import com.gh0u1l5.wechatmagician.C
+import com.gh0u1l5.wechatmagician.Global.SETTINGS_CHATTING_RECALL
+import com.gh0u1l5.wechatmagician.Global.SETTINGS_SNS_DELETE_COMMENT
+import com.gh0u1l5.wechatmagician.Global.SETTINGS_SNS_DELETE_MOMENT
 import com.gh0u1l5.wechatmagician.Global.STATUS_FLAG_DATABASE
 import com.gh0u1l5.wechatmagician.backend.WechatPackage
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.LABEL_DELETED
 import com.gh0u1l5.wechatmagician.storage.Preferences
-import com.gh0u1l5.wechatmagician.storage.Strings
-import com.gh0u1l5.wechatmagician.storage.Strings.LABEL_DELETED
 import com.gh0u1l5.wechatmagician.storage.cache.MessageCache
 import com.gh0u1l5.wechatmagician.storage.database.MainDatabase.mainDB
 import com.gh0u1l5.wechatmagician.storage.database.SnsDatabase.snsDB
@@ -33,16 +36,10 @@ object Database {
         preferences = _preferences
     }
 
-    private val str = Strings
+    private val str = LocalizedStrings
     private val pkg = WechatPackage
 
     @JvmStatic fun hookDatabase() {
-        when (null) {
-            pkg.SQLiteDatabase,
-            pkg.SQLiteCursorFactory,
-            pkg.SQLiteErrorHandler -> return
-        }
-
         // Hook SQLiteDatabase constructors to catch the database instances.
         hookAllConstructors(pkg.SQLiteDatabase, object : XC_MethodHook() {
             @Throws(Throwable::class)
@@ -92,7 +89,7 @@ object Database {
                         if (!values.getAsString("content").startsWith("\"")) {
                             return
                         }
-                        if (!preferences!!.getBoolean("settings_chatting_recall", true)) {
+                        if (!preferences!!.getBoolean(SETTINGS_CHATTING_RECALL, true)) {
                             return
                         }
                         handleMessageRecall(values)
@@ -108,7 +105,7 @@ object Database {
                         if (values["stringSeq"] in SnsBlacklist) {
                             return
                         }
-                        if (!preferences!!.getBoolean("settings_sns_delete_moment", true)) {
+                        if (!preferences!!.getBoolean(SETTINGS_SNS_DELETE_MOMENT, true)) {
                             return
                         }
                         val content = values["content"] as ByteArray?
@@ -121,7 +118,7 @@ object Database {
                         if (values["commentflag"] != 1) {
                             return
                         }
-                        if (!preferences!!.getBoolean("settings_sns_delete_comment", true)) {
+                        if (!preferences!!.getBoolean(SETTINGS_SNS_DELETE_COMMENT, true)) {
                             return
                         }
                         val curActionBuf = values["curActionBuf"] as ByteArray?
@@ -168,7 +165,7 @@ object Database {
 
     // handleMessageRecall notifies user that someone has recalled the given message.
     private fun handleMessageRecall(values: ContentValues) {
-        if (pkg.MsgStorageObject == null || pkg.MsgStorageInsertMethod == null) {
+        if (pkg.MsgStorageObject == null) {
             return
         }
 
@@ -184,9 +181,9 @@ object Database {
             XposedHelpers.setObjectField(copy, "field_content", values["content"])
             XposedHelpers.setLongField(copy, "field_createTime", createTime + 1L)
 
-            when (pkg.MsgStorageInsertMethod?.parameterTypes?.size) {
-                1 -> pkg.MsgStorageInsertMethod?.invoke(pkg.MsgStorageObject, copy)
-                2 -> pkg.MsgStorageInsertMethod?.invoke(pkg.MsgStorageObject, copy, false)
+            when (pkg.MsgStorageInsertMethod.parameterTypes.size) {
+                1 -> pkg.MsgStorageInsertMethod.invoke(pkg.MsgStorageObject, copy)
+                2 -> pkg.MsgStorageInsertMethod.invoke(pkg.MsgStorageObject, copy, false)
             }
         } catch (e: Throwable) {
             XposedBridge.log("DB => Handle message recall failed: $e")
