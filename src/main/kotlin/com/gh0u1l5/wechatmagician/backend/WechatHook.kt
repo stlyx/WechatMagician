@@ -6,6 +6,7 @@ import com.gh0u1l5.wechatmagician.Global.FOLDER_SHARED
 import com.gh0u1l5.wechatmagician.Global.MAGICIAN_PACKAGE_NAME
 import com.gh0u1l5.wechatmagician.Global.PREFERENCE_NAME_DEVELOPER
 import com.gh0u1l5.wechatmagician.Global.PREFERENCE_NAME_SETTINGS
+import com.gh0u1l5.wechatmagician.Global.WAIT_TIMEOUT
 import com.gh0u1l5.wechatmagician.Global.WECHAT_PACKAGE_NAME
 import com.gh0u1l5.wechatmagician.backend.plugins.*
 import com.gh0u1l5.wechatmagician.storage.Preferences
@@ -81,33 +82,6 @@ class WechatHook : IXposedHookLoadPackage {
         tryHook(pluginDeveloper::traceLogCat)
         tryHook(pluginDeveloper::traceXMLParse)
 
-        val pluginAutoLogin = AutoLogin
-        pluginAutoLogin.init(settings)
-        tryHook(pluginAutoLogin::enableAutoLogin)
-
-        val pluginUnreadCount = UnreadCount
-        pluginUnreadCount.init(settings)
-        tryHook(pluginUnreadCount::disableMessageUnreadCount)
-
-        val pluginSnsForward = SnsForward
-        tryHook(pluginSnsForward::setLongClickListenerForSnsUserUI)
-        tryHook(pluginSnsForward::setLongClickListenerForSnsTimeLineUI)
-        tryHook(pluginSnsForward::cleanTextViewBeforeForwarding)
-
-        val pluginSecretFriend = SecretFriend
-        pluginSecretFriend.init(loader, settings)
-        tryHook(pluginSecretFriend::addHideOptionInPopupMenu)
-        tryHook(pluginSecretFriend::tamperAdapterCount)
-        tryHook(pluginSecretFriend::hideSecretFriend)
-        tryHook(pluginSecretFriend::hideSecretFriendConversation)
-        tryHook(pluginSecretFriend::hideSecretFriendChattingWindow)
-
-        val pluginLimits = Limits
-        pluginLimits.init(settings)
-        tryHook(pluginLimits::breakSelectPhotosLimit)
-        tryHook(pluginLimits::breakSelectContactLimit)
-        tryHook(pluginLimits::breakSelectConversationLimit)
-
         val pluginStorage = Storage
         tryHook(pluginStorage::hookMsgStorage)
 //        tryHook(pluginStorage::hookImgStorage)
@@ -127,8 +101,36 @@ class WechatHook : IXposedHookLoadPackage {
         pluginSearchBar.init(settings)
         tryHook(pluginSearchBar::hijackSearchBar)
 
+        val pluginPopupMenu = PopupMenu
+        pluginPopupMenu.init(settings)
+        tryHook(pluginPopupMenu::addMenuItemsForContacts)
+        tryHook(pluginPopupMenu::addMenuItemsForConversations)
+
+        val pluginAutoLogin = AutoLogin
+        pluginAutoLogin.init(settings)
+        tryHook(pluginAutoLogin::enableAutoLogin)
+
+        val pluginSnsForward = SnsForward
+        tryHook(pluginSnsForward::setLongClickableForSnsUserUI)
+        tryHook(pluginSnsForward::setLongClickListenerForSnsUserUI)
+        tryHook(pluginSnsForward::setLongClickListenerForSnsTimeLineUI)
+        tryHook(pluginSnsForward::cleanTextViewBeforeForwarding)
+
+        val pluginSecretFriend = SecretFriend
+        pluginSecretFriend.init(settings)
+        tryHook(pluginSecretFriend::tamperAdapterCount)
+        tryHook(pluginSecretFriend::hideSecretFriend)
+        tryHook(pluginSecretFriend::hideSecretFriendConversation)
+        tryHook(pluginSecretFriend::hideSecretFriendChattingWindow)
+
+        val pluginLimits = Limits
+        pluginLimits.init(settings)
+        tryHook(pluginLimits::breakSelectPhotosLimit)
+        tryHook(pluginLimits::breakSelectContactLimit)
+        tryHook(pluginLimits::breakSelectConversationLimit)
+
         thread(start = true) {
-            sleep(10000) // Wait 10 seconds for hooking
+            sleep(WAIT_TIMEOUT) // Wait a while for hooking
             val wechatDataDir = getApplicationDataDir(context)
             val magicianDataDir = wechatDataDir.replace(WECHAT_PACKAGE_NAME, MAGICIAN_PACKAGE_NAME)
             WechatPackage.writeStatus("$magicianDataDir/$FOLDER_SHARED/status")

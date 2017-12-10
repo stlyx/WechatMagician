@@ -3,7 +3,7 @@ package com.gh0u1l5.wechatmagician
 object Global {
     val SALT = "W3ch4tM4g1c14n"
     val LOG_TAG = "WechatMagician"
-    val WAIT_TIMEOUT = 20000L // 20 seconds
+    val WAIT_TIMEOUT = 10000L // 10 seconds
 
     val XPOSED_PACKAGE_NAME   = "de.robv.android.xposed.installer"
     val WECHAT_PACKAGE_NAME   = "com.tencent.mm"
@@ -27,7 +27,6 @@ object Global {
     val SETTINGS_AUTO_LOGIN                     = "settings_auto_login"
     val SETTINGS_CHATTING_RECALL                = "settings_chatting_recall"
     val SETTINGS_CHATTING_RECALL_PROMPT         = "settings_chatting_recall_prompt"
-    val SETTINGS_DISABLE_UNREAD_COUNT           = "settings_disable_unread_count"
     val SETTINGS_INTERFACE_HIDE_ICON            = "settings_interface_hide_icon"
     val SETTINGS_SECRET_FRIEND                  = "settings_secret_friend"
     val SETTINGS_SECRET_FRIEND_PASSWORD         = "settings_secret_friend_password"
@@ -52,5 +51,6 @@ object Global {
     val ACTION_UPDATE_PREF = "$MAGICIAN_PACKAGE_NAME.ACTION_UPDATE_PREF"
     val PREFERENCE_STRING_LIST_KEYS = listOf(SETTINGS_SNS_KEYWORD_BLACKLIST_CONTENT)
 
-    val ITEM_ID_BUTTON_HIDE_FRIEND = 0x510
+    val ITEM_ID_BUTTON_HIDE_FRIEND  = 0x510
+    val ITEM_ID_BUTTON_CLEAN_UNREAD = 0x511
 }
