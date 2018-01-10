@@ -3,7 +3,6 @@ package com.gh0u1l5.wechatmagician
 object Global {
     val SALT = "W3ch4tM4g1c14n"
     val LOG_TAG = "WechatMagician"
-    val WAIT_TIMEOUT = 10000L // 10 seconds
 
     val XPOSED_PACKAGE_NAME   = "de.robv.android.xposed.installer"
     val WECHAT_PACKAGE_NAME   = "com.tencent.mm"
@@ -20,14 +19,18 @@ object Global {
     val STATUS_FLAG_URI_ROUTER  = "UriRouter"
     val STATUS_FLAG_COMMAND     = "SearchBarCommand"
 
-    val PREFERENCE_NAME_SETTINGS      = "settings"
-    val PREFERENCE_NAME_DEVELOPER     = "developer"
-    val PREFERENCE_NAME_SECRET_FRIEND = "wechat-magician-secret-friend"
+    val PREFERENCE_NAME_SETTINGS        = "settings"
+    val PREFERENCE_NAME_DEVELOPER       = "developer"
+    val PREFERENCE_NAME_SECRET_FRIEND   = "wechat-magician-secret-friend"
+    val PREFERENCE_NAME_HIDDEN_CHATROOM = "wechat-magician-hidden_chatroom"
 
     val SETTINGS_AUTO_LOGIN                     = "settings_auto_login"
+    val SETTINGS_CHATTING_CHATROOM_HIDER        = "settings_chatting_chatroom_hider"
     val SETTINGS_CHATTING_RECALL                = "settings_chatting_recall"
     val SETTINGS_CHATTING_RECALL_PROMPT         = "settings_chatting_recall_prompt"
     val SETTINGS_INTERFACE_HIDE_ICON            = "settings_interface_hide_icon"
+    val SETTINGS_MARK_ALL_AS_READ               = "settings_mark_all_as_read"
+    val SETTINGS_MODULE_LANGUAGE                = "settings_module_language"
     val SETTINGS_SECRET_FRIEND                  = "settings_secret_friend"
     val SETTINGS_SECRET_FRIEND_PASSWORD         = "settings_secret_friend_password"
     val SETTINGS_SELECT_PHOTOS_LIMIT            = "settings_select_photos_limit"
@@ -51,6 +54,7 @@ object Global {
     val ACTION_UPDATE_PREF = "$MAGICIAN_PACKAGE_NAME.ACTION_UPDATE_PREF"
     val PREFERENCE_STRING_LIST_KEYS = listOf(SETTINGS_SNS_KEYWORD_BLACKLIST_CONTENT)
 
-    val ITEM_ID_BUTTON_HIDE_FRIEND  = 0x510
-    val ITEM_ID_BUTTON_CLEAN_UNREAD = 0x511
+    val ITEM_ID_BUTTON_HIDE_FRIEND   = 0x510
+    val ITEM_ID_BUTTON_HIDE_CHATROOM = 0x511
+    val ITEM_ID_BUTTON_CLEAN_UNREAD  = 0x512
 }

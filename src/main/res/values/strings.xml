@@ -20,6 +20,7 @@
     <string name="donate_wepay">Wechat Pay</string>
     <string name="status_ok">The module is loaded properly.</string>
     <string name="status_error">The module isn\'t loaded, please check the Xposed framework.</string>
+    <string name="status_outdated_xposed">Current Xposed Framework is lower than 89.0; this may cause some unexpected crashes.</string>
     <string name="prompt_alipay_not_found">Alipay Not Found</string>
     <string name="prompt_need_reboot">Take effect after reboot.</string>
     <string name="prompt_wait">Please wait for a while.....</string>
@@ -54,8 +55,19 @@
 
     <string name="pref_category_interface">Interface</string>
     <string name="pref_toggle_hide_icon">Hide Launcher Icon</string>
+    <string name="pref_option_module_language">Language</string>
+    <string-array name="pref_option_module_language_entries">
+        <item>Chinese</item>
+        <item>English</item>
+    </string-array>
+    <string-array name="pref_option_module_language_entry_values">
+        <item>zh</item>
+        <item>en</item>
+    </string-array>
 
     <string name="pref_category_chatting">Chatting</string>
+    <string name="pref_toggle_chatroom_hider">Enable Chatroom Hider</string>
+    <string name="pref_toggle_chatroom_hider_summary">Hide the useless chatrooms into Chatroom Helper.</string>
     <string name="pref_toggle_prevent_recall">Prevent Recalling</string>
     <string name="pref_text_recall_prompt">Custom Recalling Prompt</string>
     <string name="pref_text_recall_prompt_default">want to recall the message, idiot.</string>
@@ -73,6 +85,7 @@
     <string name="pref_category_settings_miscellaneous">Miscellaneous</string>
     <string name="pref_toggle_auto_login">Toggle Auto Login</string>
     <string name="pref_toggle_auto_login_summary">Automatically agree any login requests from Wechat PC client (take your own risk).</string>
+    <string name="pref_toggle_mark_all_as_read">Toggle Mark All as Read</string>
     <string name="pref_toggle_secret_friend">Enable Secret Friends</string>
     <string name="pref_text_secret_friend_password">Configure Password for Secret Friends</string>
 

@@ -1,6 +1,8 @@
 package com.gh0u1l5.wechatmagician.storage
 
+import com.gh0u1l5.wechatmagician.Global.SETTINGS_MODULE_LANGUAGE
 import de.robv.android.xposed.XposedBridge.log
+import java.util.*
 
 // LocalizedStrings describes the localized strings used by the module.
 // NOTE: we use this object instead of Android default localized resources
@@ -9,6 +11,7 @@ object LocalizedStrings {
 
     val TITLE_SECRET_FRIEND           = "title_secret_friend"
     val BUTTON_HIDE_FRIEND            = "button_hide_friend"
+    val BUTTON_HIDE_CHATROOM          = "button_hide_chatroom"
     val PROMPT_NEW_PASSWORD           = "prompt_new_password"
     val PROMPT_VERIFY_PASSWORD        = "prompt_verify_password"
     val PROMPT_USER_NOT_FOUND         = "prompt_user_not_found"
@@ -27,12 +30,14 @@ object LocalizedStrings {
     val BUTTON_OK                     = "button_ok"
     val BUTTON_CANCEL                 = "button_cancel"
 
-    @Volatile var language: String = "zh"
+    @Volatile var preferences: Preferences? = null
+    @Volatile var language: String = Locale.getDefault().language
 
     private val resources: Map<String, Map<String, String>> = mapOf(
             "zh" to mapOf(
                     TITLE_SECRET_FRIEND           to "密友",
                     BUTTON_HIDE_FRIEND            to "隐藏好友",
+                    BUTTON_HIDE_CHATROOM          to "隐藏无用群聊",
                     PROMPT_NEW_PASSWORD           to "请设定新密码",
                     PROMPT_VERIFY_PASSWORD        to "请输入解锁密码",
                     PROMPT_USER_NOT_FOUND         to "用户不存在",
@@ -54,6 +59,7 @@ object LocalizedStrings {
             "en" to mapOf(
                     TITLE_SECRET_FRIEND           to "Secret Friends",
                     BUTTON_HIDE_FRIEND            to "Hide This Friend",
+                    BUTTON_HIDE_CHATROOM          to "Hide Useless Chatroom",
                     PROMPT_NEW_PASSWORD           to "Please enter a new password:",
                     PROMPT_VERIFY_PASSWORD        to "Please enter your password:",
                     PROMPT_USER_NOT_FOUND         to "User Not Found!",
@@ -74,9 +80,15 @@ object LocalizedStrings {
             )
     )
 
+    fun init(_preferences: Preferences) {
+        preferences = _preferences
+    }
+
     operator fun get(key: String): String {
-        val res = resources[language] ?: resources["zh"]
-        val value = res!![key]
+        val language = preferences?.getString(SETTINGS_MODULE_LANGUAGE, language)
+        val resource = resources[language] ?: resources["en"]
+
+        val value = resource!![key]
         if (value == null) {
             log("RES => Resource Missing: $key")
             return "???"

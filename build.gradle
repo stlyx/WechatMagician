@@ -1,14 +1,11 @@
 buildscript {
-    ext.kotlin_version = '1.2.0'
+    ext.kotlin_version = '1.2.10'
     repositories {
         jcenter()
         google()
-        maven {
-            url "http://dl.bintray.com/kotlin/kotlin-eap-1.2"
-        }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.1.0-alpha04'
+        classpath 'com.android.tools.build:gradle:3.1.0-alpha06'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
@@ -23,12 +20,15 @@ android {
     defaultConfig {
         applicationId "com.gh0u1l5.wechatmagician"
         minSdkVersion 19
-        maxSdkVersion 26
+        maxSdkVersion 27
         targetSdkVersion 27
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_7
         targetCompatibility JavaVersion.VERSION_1_7
+    }
+    lintOptions {
+        checkReleaseBuilds false
     }
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
@@ -38,9 +38,6 @@ android {
 repositories {
     jcenter()
     google()
-    maven {
-        url 'http://dl.bintray.com/kotlin/kotlin-eap-1.2'
-    }
 }
 
 dependencies {
@@ -58,6 +55,7 @@ dependencies {
     compileOnly 'de.robv.android.xposed:api:53'
     compileOnly 'de.robv.android.xposed:api:53:sources'
 
-    implementation files('apk-parser.jar')
+    implementation 'me.leolin:ShortcutBadger:1.1.19@aar'
+    implementation 'net.dongliu:apk-parser:2.4.2'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jre7:$kotlin_version"
 }

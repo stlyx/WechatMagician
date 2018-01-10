@@ -1,15 +1,18 @@
 package com.gh0u1l5.wechatmagician.backend
 
 import android.content.Context
+import android.os.Build
 import com.gh0u1l5.wechatmagician.C
 import com.gh0u1l5.wechatmagician.Global.FOLDER_SHARED
 import com.gh0u1l5.wechatmagician.Global.MAGICIAN_PACKAGE_NAME
 import com.gh0u1l5.wechatmagician.Global.PREFERENCE_NAME_DEVELOPER
 import com.gh0u1l5.wechatmagician.Global.PREFERENCE_NAME_SETTINGS
-import com.gh0u1l5.wechatmagician.Global.WAIT_TIMEOUT
 import com.gh0u1l5.wechatmagician.Global.WECHAT_PACKAGE_NAME
 import com.gh0u1l5.wechatmagician.backend.plugins.*
+import com.gh0u1l5.wechatmagician.frontend.wechat.AdapterHider
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings
 import com.gh0u1l5.wechatmagician.storage.Preferences
+import com.gh0u1l5.wechatmagician.storage.list.ChatroomHideList
 import com.gh0u1l5.wechatmagician.storage.list.SecretFriendList
 import com.gh0u1l5.wechatmagician.util.FileUtil.getApplicationDataDir
 import de.robv.android.xposed.IXposedHookLoadPackage
@@ -17,7 +20,6 @@ import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge.log
 import de.robv.android.xposed.XposedHelpers.findAndHookMethod
 import de.robv.android.xposed.callbacks.XC_LoadPackage
-import java.lang.Thread.sleep
 import kotlin.concurrent.thread
 
 // WechatHook is the entry point of the module, here we load all the plugins.
@@ -25,6 +27,8 @@ class WechatHook : IXposedHookLoadPackage {
 
     private val settings = Preferences()
     private val developer = Preferences()
+
+    private val hookThreadQueue: MutableList<Thread> = arrayListOf()
 
     // NOTE: Hooking Application.attach is necessary because Android 4.X is not supporting
     //       multi-dex applications natively. More information are available in this link:
@@ -38,10 +42,14 @@ class WechatHook : IXposedHookLoadPackage {
     }
 
     private inline fun tryHook(crossinline hook: () -> Unit) {
-        thread(start = true) {
-            hook()
-        }.setUncaughtExceptionHandler { _, throwable ->
-            log(throwable)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try { hook() } catch (e: Throwable) { log(e) }
+        } else {
+            hookThreadQueue.add(thread(start = true) {
+                hook()
+            }.apply {
+                setUncaughtExceptionHandler { _, e -> log(e) }
+            })
         }
     }
 
@@ -67,10 +75,18 @@ class WechatHook : IXposedHookLoadPackage {
     private fun handleLoadWechat(lpparam: XC_LoadPackage.LoadPackageParam, context: Context) {
         val loader = lpparam.classLoader
 
-        WechatPackage.init(lpparam)
-        SecretFriendList.init(context)
         settings.load(context, PREFERENCE_NAME_SETTINGS)
         developer.load(context, PREFERENCE_NAME_DEVELOPER)
+
+        WechatPackage.init(lpparam)
+        LocalizedStrings.init(settings)
+        SecretFriendList.init(context)
+        ChatroomHideList.init(context)
+
+        tryHook(WechatPackage::hookAdapters)
+        tryHook(AdapterHider::hookAdaptersGetItem)
+        tryHook(AdapterHider::hookAdaptersGetCount)
+        tryHook(AdapterHider::hookAdapterNotifyChanged)
 
         val pluginDeveloper = Developer
         pluginDeveloper.init(loader, developer)
@@ -118,10 +134,10 @@ class WechatHook : IXposedHookLoadPackage {
 
         val pluginSecretFriend = SecretFriend
         pluginSecretFriend.init(settings)
-        tryHook(pluginSecretFriend::tamperAdapterCount)
-        tryHook(pluginSecretFriend::hideSecretFriend)
-        tryHook(pluginSecretFriend::hideSecretFriendConversation)
-        tryHook(pluginSecretFriend::hideSecretFriendChattingWindow)
+        tryHook(pluginSecretFriend::hideChattingWindow)
+
+        val pluginChatroomHider = ChatroomHider
+        pluginChatroomHider.init(settings)
 
         val pluginLimits = Limits
         pluginLimits.init(settings)
@@ -129,13 +145,11 @@ class WechatHook : IXposedHookLoadPackage {
         tryHook(pluginLimits::breakSelectContactLimit)
         tryHook(pluginLimits::breakSelectConversationLimit)
 
-        thread(start = true) {
-            sleep(WAIT_TIMEOUT) // Wait a while for hooking
-            val wechatDataDir = getApplicationDataDir(context)
-            val magicianDataDir = wechatDataDir.replace(WECHAT_PACKAGE_NAME, MAGICIAN_PACKAGE_NAME)
-            WechatPackage.writeStatus("$magicianDataDir/$FOLDER_SHARED/status")
-        }.setUncaughtExceptionHandler { _, throwable ->
-            log(throwable)
-        }
+        // Wait until all the hook threads finished
+        hookThreadQueue.forEach { it.join() }
+        // Write the status of all the hooks
+        val wechatDataDir = getApplicationDataDir(context)
+        val magicianDataDir = wechatDataDir.replace(WECHAT_PACKAGE_NAME, MAGICIAN_PACKAGE_NAME)
+        WechatPackage.writeStatus("$magicianDataDir/$FOLDER_SHARED/status")
     }
 }

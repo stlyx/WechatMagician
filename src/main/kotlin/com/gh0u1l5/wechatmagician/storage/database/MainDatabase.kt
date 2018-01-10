@@ -3,49 +3,58 @@ package com.gh0u1l5.wechatmagician.storage.database
 import android.content.ContentValues
 import de.robv.android.xposed.XposedBridge.log
 import de.robv.android.xposed.XposedHelpers.callMethod
-import java.util.concurrent.ConcurrentHashMap
 
 object MainDatabase {
+
+    data class Contact(
+            val alias: String,
+            val username: String,
+            val nickname: String
+    )
+
+    data class Conversation(
+            val username: String,
+            val digest: String,
+            val digestUser: String,
+            val atCount: Int,
+            val unreadCount: Int
+    )
+
     // snsDB is the database that stores SNS information.
     @Volatile var mainDB: Any? = null
 
-    // nameCache maps nicknames to corresponding usernames
-    private val nameCache: MutableMap<String, String> = ConcurrentHashMap()
-
-    fun cacheNicknameUsernamePair(nickname: String?, username: String?) {
-        if (nickname == null || username == null) {
-            return
-        }
-        nameCache[nickname] = username
-    }
-
     fun cleanUnreadCount() {
-        val clean = ContentValues().apply { put("unReadCount", 0) }
-        callMethod(mainDB, "update", "rconversation", clean, null, null)
+        val database = mainDB ?: return
+        val clean = ContentValues().apply {
+            put("unReadCount", 0)
+            put("unReadMuteCount", 0)
+        }
+        callMethod(database, "update", "rconversation", clean, null, null)
     }
 
-    fun getUsernameFromNickname(nickname: String): String? {
-        if (nickname in nameCache) {
-            return nameCache[nickname]
-        }
-
-        if (nickname == "") return null
-        val db = mainDB ?: return null
-
+    private fun getContacts(selection: String, selectionArgs: Array<String>, ignoreDuplicate: Boolean = false): List<Contact>? {
+        val database = mainDB ?: return null
         var cursor: Any? = null
         try {
-            cursor = callMethod(db, "query",
-                    "rcontact", arrayOf("username"), "nickname=?", arrayOf(nickname),
+            val columns = arrayOf("alias", "username", "nickname")
+            cursor = callMethod(database, "query",
+                    "rcontact", columns, selection, selectionArgs,
                     null, null, null, null
             )
-            val count = callMethod(cursor, "getCount")
-            if (count != 1) {
-                return null
+            val count = callMethod(cursor, "getCount") as Int
+            if (count == 0) {
+                log("Contact Not Found: selection={$selection}, selectionArgs={$selectionArgs}")
             }
-            callMethod(cursor, "moveToFirst")
-            val username = callMethod(cursor, "getString", 0) as String
-            nameCache[nickname] = username
-            return username
+            if (count > 1 && !ignoreDuplicate) {
+                log("Duplicate Contact: selection={$selection}, selectionArgs={$selectionArgs}")
+            }
+            return (0 until count).map {
+                callMethod(cursor, "moveToNext")
+                val alias    = callMethod(cursor, "getString", 0) as String
+                val username = callMethod(cursor, "getString", 1) as String
+                val nickname = callMethod(cursor, "getString", 2) as String
+                Contact(alias, username, nickname)
+            }
         } catch (e: Throwable) {
             log(e); return null
         } finally {
@@ -53,5 +62,67 @@ object MainDatabase {
                 callMethod(cursor, "close")
             }
         }
+    }
+
+    fun getContactsByAlias(alias: String): List<Contact>? {
+        if (alias == "") {
+            return null
+        }
+        return getContacts("alias=?", arrayOf(alias), ignoreDuplicate = true)
+    }
+
+    fun getContactByNickname(nickname: String): Contact? {
+        if (nickname == "") {
+            return null
+        }
+        return getContacts("nickname=?", arrayOf(nickname))?.firstOrNull()
+    }
+
+    fun getContactByUsername(username: String): Contact? {
+        if (username == "") {
+            return null
+        }
+        return getContacts("username=?", arrayOf(username))?.firstOrNull()
+    }
+
+    private fun getConversations(selection: String, selectionArgs: Array<String>, ignoreDuplicate: Boolean = false): List<Conversation>? {
+        val database = mainDB ?: return null
+        var cursor: Any? = null
+        try {
+            val columns = arrayOf("username", "digest", "digestUser", "atCount", "unReadCount")
+            cursor = callMethod(database, "query",
+                    "rconversation", columns, selection, selectionArgs,
+                    null, null, null, null
+            )
+            val count = callMethod(cursor, "getCount") as Int
+            if (count == 0) {
+                log("Conversation Not Found: selection={$selection}, selectionArgs={$selectionArgs}")
+            }
+            if (count > 1 && !ignoreDuplicate) {
+                log("Duplicate Conversation: selection={$selection}, selectionArgs={$selectionArgs}")
+            }
+            return (0 until count).map {
+                callMethod(cursor, "moveToNext")
+                val username    = callMethod(cursor, "getString", 0) as String
+                val digest      = callMethod(cursor, "getString", 1) as String
+                val digestUser  = callMethod(cursor, "getString", 2) as String
+                val atCount     = callMethod(cursor, "getInt", 3) as Int
+                val unreadCount = callMethod(cursor, "getInt", 4) as Int
+                Conversation(username, digest, digestUser, atCount, unreadCount)
+            }
+        } catch (e: Throwable) {
+            log(e); return null
+        } finally {
+            if (cursor != null) {
+                callMethod(cursor, "close")
+            }
+        }
+    }
+
+    fun getConversationByUsername(username: String): Conversation? {
+        if (username == "") {
+            return null
+        }
+        return getConversations("username=?", arrayOf(username))?.firstOrNull()
     }
 }

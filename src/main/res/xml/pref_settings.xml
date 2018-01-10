@@ -7,8 +7,19 @@
             android:key="settings_interface_hide_icon"
             android:summary="@string/prompt_need_reboot"
             android:title="@string/pref_toggle_hide_icon" />
+        <ListPreference
+            android:defaultValue="1"
+            android:entries="@array/pref_option_module_language_entries"
+            android:entryValues="@array/pref_option_module_language_entry_values"
+            android:key="settings_module_language"
+            android:title="@string/pref_option_module_language" />
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/pref_category_chatting">
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="settings_chatting_chatroom_hider"
+            android:summary="@string/pref_toggle_chatroom_hider_summary"
+            android:title="@string/pref_toggle_chatroom_hider" />
         <SwitchPreference
             android:defaultValue="true"
             android:key="settings_chatting_recall"
@@ -60,6 +71,10 @@
             android:key="settings_auto_login"
             android:summary="@string/pref_toggle_auto_login_summary"
             android:title="@string/pref_toggle_auto_login" />
+        <SwitchPreference
+            android:defaultValue="true"
+            android:key="settings_mark_all_as_read"
+            android:title="@string/pref_toggle_mark_all_as_read" />
         <com.gh0u1l5.wechatmagician.frontend.widget.PasswordSwitchPreference
             android:defaultValue="false"
             android:key="settings_secret_friend"

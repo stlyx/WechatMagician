@@ -23,7 +23,6 @@ import com.gh0u1l5.wechatmagician.util.MessageUtil.parseSnsComment
 import com.gh0u1l5.wechatmagician.util.PackageUtil
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedBridge.hookAllConstructors
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.XposedHelpers.callMethod
 import de.robv.android.xposed.XposedHelpers.findAndHookMethod
@@ -40,19 +39,6 @@ object Database {
     private val pkg = WechatPackage
 
     @JvmStatic fun hookDatabase() {
-        // Hook SQLiteDatabase constructors to catch the database instances.
-        hookAllConstructors(pkg.SQLiteDatabase, object : XC_MethodHook() {
-            @Throws(Throwable::class)
-            override fun afterHookedMethod(param: MethodHookParam) {
-                val path = param.thisObject.toString()
-                if (path.endsWith("EnMicroMsg.db")) {
-                    if (mainDB !== param.thisObject) {
-                        mainDB = param.thisObject
-                    }
-                }
-            }
-        })
-
         // Hook SQLiteDatabase.openDatabase to initialize the database instance for SNS.
         findAndHookMethod(
                 pkg.SQLiteDatabase, "openDatabase",
@@ -78,6 +64,13 @@ object Database {
                 C.String, C.ContentValues, C.String, C.StringArray, C.Int, object : XC_MethodHook() {
             @Throws(Throwable::class)
             override fun beforeHookedMethod(param: MethodHookParam) {
+                val path = param.thisObject?.toString() ?: ""
+                if (path.endsWith("EnMicroMsg.db")) {
+                    if (mainDB !== param.thisObject) {
+                        mainDB = param.thisObject
+                    }
+                }
+
                 val table = param.args[0] as String? ?: return
                 val values = param.args[1] as ContentValues? ?: return
 

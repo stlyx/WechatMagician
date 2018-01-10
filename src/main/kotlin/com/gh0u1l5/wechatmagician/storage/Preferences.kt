@@ -6,7 +6,6 @@ import com.gh0u1l5.wechatmagician.Global.ACTION_UPDATE_PREF
 import com.gh0u1l5.wechatmagician.Global.FOLDER_SHARED_PREFS
 import com.gh0u1l5.wechatmagician.Global.MAGICIAN_PACKAGE_NAME
 import com.gh0u1l5.wechatmagician.Global.PREFERENCE_STRING_LIST_KEYS
-import com.gh0u1l5.wechatmagician.Global.WAIT_TIMEOUT
 import com.gh0u1l5.wechatmagician.Global.WECHAT_PACKAGE_NAME
 import com.gh0u1l5.wechatmagician.util.FileUtil
 import com.gh0u1l5.wechatmagician.util.FileUtil.getApplicationDataDir
@@ -105,7 +104,7 @@ class Preferences : SharedPreferences {
     private fun getValue(key: String): Any? {
         synchronized(loadChannel) {
             if (!isLoaded) {
-                loadChannel.wait(WAIT_TIMEOUT)
+                loadChannel.wait()
             }
         }
         return all?.get(key)
@@ -130,7 +129,7 @@ class Preferences : SharedPreferences {
     fun getStringList(key: String, defValue: List<String>): List<String> {
         synchronized(loadChannel) {
             if (!isLoaded) {
-                loadChannel.wait(WAIT_TIMEOUT)
+                loadChannel.wait()
             }
         }
         return listCache[key] ?: defValue
