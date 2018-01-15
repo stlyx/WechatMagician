@@ -13,6 +13,7 @@ import com.gh0u1l5.wechatmagician.Global.STATUS_FLAG_DATABASE
 import com.gh0u1l5.wechatmagician.backend.WechatPackage
 import com.gh0u1l5.wechatmagician.storage.LocalizedStrings
 import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.LABEL_DELETED
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.PROMPT_SNS_NEW_COMMENT
 import com.gh0u1l5.wechatmagician.storage.Preferences
 import com.gh0u1l5.wechatmagician.storage.cache.MessageCache
 import com.gh0u1l5.wechatmagician.storage.database.MainDatabase.mainDB
@@ -144,7 +145,7 @@ object Database {
                 val notification = when (table) {
                     "SnsComment" -> Notification.Builder(context)
                             .setSmallIcon(android.R.drawable.sym_action_chat)
-                            .setContentTitle("${parsedMsg?.get("sender")} 新评论")
+                            .setContentTitle("${parsedMsg?.get("sender")}${str[PROMPT_SNS_NEW_COMMENT]}")
                             .setContentText("${parsedMsg?.get("content")}")
                             .build()
                     else -> return
