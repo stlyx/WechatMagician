@@ -5,10 +5,13 @@ import android.view.Gravity
 import android.view.View
 import android.widget.*
 import com.gh0u1l5.wechatmagician.C
+import com.gh0u1l5.wechatmagician.backend.plugins.ChatroomHider.changeChatroomStatus
 import com.gh0u1l5.wechatmagician.backend.plugins.SnsForward.ForwardAsyncTask
-import com.gh0u1l5.wechatmagician.frontend.wechat.ListPopupAdapter
-import com.gh0u1l5.wechatmagician.frontend.wechat.ListPopupPosition
+import com.gh0u1l5.wechatmagician.frontend.wechat.ConversationAdapter
+import com.gh0u1l5.wechatmagician.frontend.wechat.ListPopupWindowPosition
+import com.gh0u1l5.wechatmagician.frontend.wechat.StringListAdapter
 import com.gh0u1l5.wechatmagician.storage.LocalizedStrings
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.MENU_CHATROOM_UNHIDE
 import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.MENU_SNS_FORWARD
 import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.MENU_SNS_SCREENSHOT
 import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.PROMPT_SCREENSHOT
@@ -64,7 +67,7 @@ object WechatEvents {
     }
 
     // Show a popup menu in SnsTimelineUI
-    fun onTimelineItemLongClick(parent: AdapterView<*>, view: View, snsId: Long, position: ListPopupPosition?): Boolean {
+    fun onTimelineItemLongClick(parent: AdapterView<*>, view: View, snsId: Long, position: ListPopupWindowPosition?): Boolean {
         val operations = listOf(str[MENU_SNS_FORWARD], str[MENU_SNS_SCREENSHOT])
         ListPopupWindow(parent.context).apply {
             if (position != null) {
@@ -84,7 +87,7 @@ object WechatEvents {
             // Set general properties for popup window
             width = parent.context.dp2px(120)
             setDropDownGravity(Gravity.CENTER)
-            setAdapter(ListPopupAdapter(view.context, operations))
+            setAdapter(StringListAdapter(view.context, operations))
             setOnItemClickListener { _, _, operation, _ ->
                 onTimelineItemPopupMenuSelected(view, snsId, operation)
                 dismiss()
@@ -111,6 +114,34 @@ object WechatEvents {
                 Toast.makeText(
                         itemView.context, str[PROMPT_SCREENSHOT] + path, Toast.LENGTH_SHORT
                 ).show()
+                return true
+            }
+            else -> return false
+        }
+    }
+
+    fun onChatroomHiderConversationLongClick(view: View, adapter: ConversationAdapter, username: String): Boolean {
+        val operations = listOf(str[MENU_CHATROOM_UNHIDE])
+        ListPopupWindow(view.context).apply {
+            anchorView = view
+            width = view.context.dp2px(140)
+            setDropDownGravity(Gravity.CENTER)
+            setAdapter(StringListAdapter(view.context, operations))
+            setOnItemClickListener { _, _, operation, _ ->
+                onChatroomHiderConversationPopupMenuSelected(adapter, username, operation)
+                dismiss()
+            }
+        }.show()
+        return true
+    }
+
+    private fun onChatroomHiderConversationPopupMenuSelected(adapter: ConversationAdapter, username: String, operation: Int): Boolean {
+        when (operation) {
+            0 -> { // Unhide
+                changeChatroomStatus(username, false)
+                adapter.conversations.clear()
+                adapter.conversations.addAll(ConversationAdapter.getConversationList())
+                adapter.notifyDataSetChanged()
                 return true
             }
             else -> return false

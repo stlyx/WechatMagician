@@ -20,11 +20,13 @@ object LocalizedStrings {
     val PROMPT_WRONG_PASSWORD         = "prompt_wrong_password"
     val MENU_SNS_FORWARD              = "menu_sns_forward"
     val MENU_SNS_SCREENSHOT           = "menu_sns_screenshot"
+    val MENU_CHATROOM_UNHIDE          = "menu_chatroom_unhide"
     val PROMPT_WAIT                   = "prompt_wait"
     val PROMPT_SCREENSHOT             = "prompt_screenshot"
     val PROMPT_SNS_INVALID            = "prompt_sns_invalid"
     val PROMPT_RECALL                 = "prompt_recall"
     val LABEL_DELETED                 = "label_deleted"
+    val LABEL_UNNAMED                 = "label_unnamed"
     val BUTTON_SELECT_ALL             = "button_select_all"
     val BUTTON_CLEAN_UNREAD           = "button_clean_unread"
     val BUTTON_OK                     = "button_ok"
@@ -47,11 +49,13 @@ object LocalizedStrings {
                     PROMPT_WRONG_PASSWORD         to "密码错误",
                     MENU_SNS_FORWARD              to "转发",
                     MENU_SNS_SCREENSHOT           to "截图",
+                    MENU_CHATROOM_UNHIDE          to "还原群聊",
                     PROMPT_WAIT                   to "请稍等片刻……",
                     PROMPT_SCREENSHOT             to "截图已保存至 ",
                     PROMPT_SNS_INVALID            to "数据失效或已删除",
                     PROMPT_RECALL                 to "妄图撤回一条消息，啧啧",
                     LABEL_DELETED                 to "[已删除]",
+                    LABEL_UNNAMED                 to "[未命名]",
                     BUTTON_SELECT_ALL             to "全选",
                     BUTTON_CLEAN_UNREAD           to "清空全部未读提醒",
                     BUTTON_OK                     to "确定",
@@ -70,11 +74,13 @@ object LocalizedStrings {
                     PROMPT_WRONG_PASSWORD         to "Wrong Password!",
                     MENU_SNS_FORWARD              to "Forward",
                     MENU_SNS_SCREENSHOT           to "Screenshot",
+                    MENU_CHATROOM_UNHIDE          to "Unhide",
                     PROMPT_WAIT                   to "Please wait for a while......",
                     PROMPT_SCREENSHOT             to "The screenshot has been saved to ",
                     PROMPT_SNS_INVALID            to "Record is invalid or deleted.",
                     PROMPT_RECALL                 to "want to recall the message, idiot.",
                     LABEL_DELETED                 to "[Deleted]",
+                    LABEL_UNNAMED                 to "[Unnamed]",
                     BUTTON_SELECT_ALL             to "All",
                     BUTTON_CLEAN_UNREAD           to "Mark All as Read",
                     BUTTON_OK                     to "Okay",

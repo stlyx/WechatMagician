@@ -2,6 +2,7 @@ package com.gh0u1l5.wechatmagician.backend
 
 import android.content.Context
 import android.os.Build
+import com.gh0u1l5.wechatmagician.BuildConfig
 import com.gh0u1l5.wechatmagician.C
 import com.gh0u1l5.wechatmagician.Global.FOLDER_SHARED
 import com.gh0u1l5.wechatmagician.Global.MAGICIAN_PACKAGE_NAME
@@ -15,11 +16,14 @@ import com.gh0u1l5.wechatmagician.storage.Preferences
 import com.gh0u1l5.wechatmagician.storage.list.ChatroomHideList
 import com.gh0u1l5.wechatmagician.storage.list.SecretFriendList
 import com.gh0u1l5.wechatmagician.util.FileUtil.getApplicationDataDir
+import dalvik.system.PathClassLoader
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge.log
+import de.robv.android.xposed.XposedHelpers.callMethod
 import de.robv.android.xposed.XposedHelpers.findAndHookMethod
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import java.io.File
 import kotlin.concurrent.thread
 
 // WechatHook is the entry point of the module, here we load all the plugins.
@@ -28,7 +32,7 @@ class WechatHook : IXposedHookLoadPackage {
     private val settings = Preferences()
     private val developer = Preferences()
 
-    private val hookThreadQueue: MutableList<Thread> = arrayListOf()
+    private val hookThreadQueue: MutableList<Thread> = mutableListOf()
 
     // NOTE: Hooking Application.attach is necessary because Android 4.X is not supporting
     //       multi-dex applications natively. More information are available in this link:
@@ -43,12 +47,12 @@ class WechatHook : IXposedHookLoadPackage {
 
     private inline fun tryHook(crossinline hook: () -> Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            try { hook() } catch (e: Throwable) { log(e) }
+            try { hook() } catch (t: Throwable) { log(t) }
         } else {
             hookThreadQueue.add(thread(start = true) {
                 hook()
             }.apply {
-                setUncaughtExceptionHandler { _, e -> log(e) }
+                setUncaughtExceptionHandler { _, t -> log(t) }
             })
         }
     }
@@ -61,20 +65,22 @@ class WechatHook : IXposedHookLoadPackage {
                     hookApplicationAttach(lpparam.classLoader, { context ->
                         val pluginFrontend = Frontend
                         pluginFrontend.init(lpparam.classLoader)
-                        tryHook(pluginFrontend::notifyStatus)
+                        pluginFrontend.notifyStatus()
                         pluginFrontend.setDirectoryPermissions(context)
                     })
                 WECHAT_PACKAGE_NAME ->
                     hookApplicationAttach(lpparam.classLoader, { context ->
-                        handleLoadWechat(lpparam, context)
+                        if (!BuildConfig.DEBUG) {
+                            handleLoadWechat(lpparam, context)
+                        } else {
+                            handleLoadWechatOnFly(lpparam, context)
+                        }
                     })
             }
         } catch (e: Throwable) { log(e) }
     }
 
     private fun handleLoadWechat(lpparam: XC_LoadPackage.LoadPackageParam, context: Context) {
-        val loader = lpparam.classLoader
-
         settings.load(context, PREFERENCE_NAME_SETTINGS)
         developer.load(context, PREFERENCE_NAME_DEVELOPER)
 
@@ -89,7 +95,7 @@ class WechatHook : IXposedHookLoadPackage {
         tryHook(AdapterHider::hookAdapterNotifyChanged)
 
         val pluginDeveloper = Developer
-        pluginDeveloper.init(loader, developer)
+        pluginDeveloper.init(developer)
         tryHook(pluginDeveloper::traceTouchEvents)
         tryHook(pluginDeveloper::traceActivities)
         tryHook(pluginDeveloper::dumpPopupMenu)
@@ -151,5 +157,22 @@ class WechatHook : IXposedHookLoadPackage {
         val wechatDataDir = getApplicationDataDir(context)
         val magicianDataDir = wechatDataDir.replace(WECHAT_PACKAGE_NAME, MAGICIAN_PACKAGE_NAME)
         WechatPackage.writeStatus("$magicianDataDir/$FOLDER_SHARED/status")
+    }
+
+    private fun handleLoadWechatOnFly(lpparam: XC_LoadPackage.LoadPackageParam, context: Context) {
+        (0 until 10).forEach { index ->
+            val path = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+                "/data/app/$MAGICIAN_PACKAGE_NAME-$index.apk"
+            } else {
+                "/data/app/$MAGICIAN_PACKAGE_NAME-$index/base.apk"
+            }
+            if (File(path).exists()) {
+                val pathClassLoader = PathClassLoader(path, ClassLoader.getSystemClassLoader())
+                val clazz = Class.forName("$MAGICIAN_PACKAGE_NAME.backend.WechatHook", true, pathClassLoader)
+                callMethod(clazz.newInstance(), "handleLoadWechat", lpparam, context)
+                return
+            }
+        }
+        log("Cannot load module on fly: APK not found")
     }
 }

@@ -14,8 +14,9 @@ import android.widget.Toast
 import com.gh0u1l5.wechatmagician.C
 import com.gh0u1l5.wechatmagician.backend.WechatEvents
 import com.gh0u1l5.wechatmagician.backend.WechatPackage
-import com.gh0u1l5.wechatmagician.frontend.wechat.ListPopupPosition
+import com.gh0u1l5.wechatmagician.frontend.wechat.ListPopupWindowPosition
 import com.gh0u1l5.wechatmagician.storage.LocalizedStrings
+import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.PROMPT_SNS_INVALID
 import com.gh0u1l5.wechatmagician.storage.cache.SnsCache
 import com.gh0u1l5.wechatmagician.util.DownloadUtil
 import com.gh0u1l5.wechatmagician.util.FileUtil
@@ -44,7 +45,7 @@ object SnsForward {
         override fun doInBackground(vararg params: Void): Throwable? {
             return try {
                 if (snsInfo == null) {
-                    throw Error(str[LocalizedStrings.PROMPT_SNS_INVALID] + "(snsId: $snsId)")
+                    throw Error(str[PROMPT_SNS_INVALID] + "(snsId: $snsId)")
                 }
                 if (snsInfo.contentUrl != null) {
                     if (snsInfo.medias.isNotEmpty()) {
@@ -59,6 +60,8 @@ object SnsForward {
                             "2" -> DownloadUtil.downloadImage("$storage/.cache/$i", media)
                             "6" -> DownloadUtil.downloadVideo("$storage/.cache/$i", media)
                         }
+                    }.apply {
+                        setUncaughtExceptionHandler { _, t -> log(t) }
                     }
                 }.forEach { it.join() }; null
             } catch (e: Throwable) { e }
@@ -170,7 +173,7 @@ object SnsForward {
                         val view = listView.getViewAtPosition(position)
                         val item = listView.getItemAtPosition(position)
                         val snsId = getLongField(item, "field_snsId")
-                        val popup = ListPopupPosition(listView, lastKnownX, lastKnownY)
+                        val popup = ListPopupWindowPosition(listView, lastKnownX, lastKnownY)
                         events.onTimelineItemLongClick(listView, view, snsId, popup)
                     }
                 })
