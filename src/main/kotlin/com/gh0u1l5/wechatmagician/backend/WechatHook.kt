@@ -1,74 +1,107 @@
 package com.gh0u1l5.wechatmagician.backend
 
 import android.content.Context
+import android.content.Intent
+import android.content.res.XModuleResources
 import android.os.Build
 import com.gh0u1l5.wechatmagician.BuildConfig
 import com.gh0u1l5.wechatmagician.C
-import com.gh0u1l5.wechatmagician.Global.FOLDER_SHARED
+import com.gh0u1l5.wechatmagician.Global.ACTION_WECHAT_STARTUP
 import com.gh0u1l5.wechatmagician.Global.MAGICIAN_PACKAGE_NAME
 import com.gh0u1l5.wechatmagician.Global.PREFERENCE_NAME_DEVELOPER
 import com.gh0u1l5.wechatmagician.Global.PREFERENCE_NAME_SETTINGS
-import com.gh0u1l5.wechatmagician.Global.WECHAT_PACKAGE_NAME
+import com.gh0u1l5.wechatmagician.Global.STATUS_FLAG_RESOURCES
+import com.gh0u1l5.wechatmagician.Global.tryWithLog
+import com.gh0u1l5.wechatmagician.Global.tryWithThread
 import com.gh0u1l5.wechatmagician.backend.plugins.*
 import com.gh0u1l5.wechatmagician.frontend.wechat.AdapterHider
 import com.gh0u1l5.wechatmagician.storage.LocalizedStrings
 import com.gh0u1l5.wechatmagician.storage.Preferences
 import com.gh0u1l5.wechatmagician.storage.list.ChatroomHideList
 import com.gh0u1l5.wechatmagician.storage.list.SecretFriendList
-import com.gh0u1l5.wechatmagician.util.FileUtil.getApplicationDataDir
 import dalvik.system.PathClassLoader
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
+import de.robv.android.xposed.XC_MethodReplacement
+import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedBridge.log
-import de.robv.android.xposed.XposedHelpers.callMethod
 import de.robv.android.xposed.XposedHelpers.findAndHookMethod
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.io.File
-import kotlin.concurrent.thread
 
 // WechatHook is the entry point of the module, here we load all the plugins.
 class WechatHook : IXposedHookLoadPackage {
 
-    private val settings = Preferences()
-    private val developer = Preferences()
+    companion object {
+        @Volatile var MODULE_RES: XModuleResources? = null
+    }
 
     private val hookThreadQueue: MutableList<Thread> = mutableListOf()
+
+    private val settings = Preferences()
+    private val developer = Preferences()
 
     // NOTE: Hooking Application.attach is necessary because Android 4.X is not supporting
     //       multi-dex applications natively. More information are available in this link:
     //       https://github.com/rovo89/xposedbridge/issues/30
+    // NOTE: Since Wechat 6.5.16, the MultiDex installation became asynchronous. It is not
+    //       guaranteed to be finished after Application.attach, but the exceptions caused
+    //       by this can be ignored safely (See details in tryHook).
     private inline fun hookApplicationAttach(loader: ClassLoader, crossinline callback: (Context) -> Unit) {
-        findAndHookMethod("android.app.Application",loader, "attach", C.Context, object : XC_MethodHook() {
+        findAndHookMethod("android.app.Application", loader, "attach", C.Context, object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
                 callback(param.thisObject as Context)
             }
         })
     }
 
+    // isWechat returns true if the current application seems to be Wechat.
+    private fun isWechat(lpparam: XC_LoadPackage.LoadPackageParam): Boolean {
+        val features = listOf (
+                "libwechatcommon.so",
+                "libwechatmm.so",
+                "libwechatnetwork.so",
+                "libwechatsight.so",
+                "libwechatxlog.so"
+        )
+        return try {
+            val libraryDir = File(lpparam.appInfo.nativeLibraryDir)
+            val hits = features.filter { filename ->
+                File(libraryDir, filename).exists()
+            }.size
+            (hits.toDouble() / features.size) > 0.5F
+        } catch (t: Throwable) { false }
+    }
+
+    // NOTE: For Android 7.X or later, multi-thread and lazy initialization
+    //       causes unexpected crashes with WeXposed. So I fall back to the
+    //       original logic for now.
     private inline fun tryHook(crossinline hook: () -> Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            try { hook() } catch (t: Throwable) { log(t) }
-        } else {
-            hookThreadQueue.add(thread(start = true) {
-                hook()
-            }.apply {
-                setUncaughtExceptionHandler { _, t -> log(t) }
-            })
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.N -> tryWithLog { hook() }
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP -> hookThreadQueue.add(tryWithThread { hook() })
+            else -> hookThreadQueue.add(tryWithThread { try { hook() } catch (t: Throwable) { /* Ignore */ } })
         }
+    }
+
+    private fun loadModuleResource(context: Context) {
+        hookThreadQueue.add(tryWithThread {
+            val pm = context.packageManager
+            val path = pm.getApplicationInfo(MAGICIAN_PACKAGE_NAME, 0).publicSourceDir
+            MODULE_RES = XModuleResources.createInstance(path, null)
+            WechatPackage.setStatus(STATUS_FLAG_RESOURCES, true)
+        })
     }
 
     // NOTE: Remember to catch all the exceptions here, otherwise you may get boot loop.
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        try {
+        tryWithLog {
             when (lpparam.packageName) {
                 MAGICIAN_PACKAGE_NAME ->
-                    hookApplicationAttach(lpparam.classLoader, { context ->
-                        val pluginFrontend = Frontend
-                        pluginFrontend.init(lpparam.classLoader)
-                        pluginFrontend.notifyStatus()
-                        pluginFrontend.setDirectoryPermissions(context)
+                    hookApplicationAttach(lpparam.classLoader, { _ ->
+                        handleLoadMagician(lpparam.classLoader)
                     })
-                WECHAT_PACKAGE_NAME ->
+                else -> if (isWechat(lpparam)) {
                     hookApplicationAttach(lpparam.classLoader, { context ->
                         if (!BuildConfig.DEBUG) {
                             handleLoadWechat(lpparam, context)
@@ -76,13 +109,33 @@ class WechatHook : IXposedHookLoadPackage {
                             handleLoadWechatOnFly(lpparam, context)
                         }
                     })
+                }
             }
-        } catch (e: Throwable) { log(e) }
+        }
     }
 
+    @Suppress("DEPRECATION")
+    private fun handleLoadMagician(loader: ClassLoader) {
+        findAndHookMethod(
+                "$MAGICIAN_PACKAGE_NAME.frontend.fragments.StatusFragment", loader,
+                "isModuleLoaded", object : XC_MethodReplacement() {
+            override fun replaceHookedMethod(param: MethodHookParam): Any = true
+        })
+        findAndHookMethod(
+                "$MAGICIAN_PACKAGE_NAME.frontend.fragments.StatusFragment", loader,
+                "getXposedVersion", object : XC_MethodReplacement() {
+            override fun replaceHookedMethod(param: MethodHookParam): Any = XposedBridge.XPOSED_BRIDGE_VERSION
+        })
+    }
+
+    // handleLoadWechat is the entry point for Wechat hooking logic.
     private fun handleLoadWechat(lpparam: XC_LoadPackage.LoadPackageParam, context: Context) {
-        settings.load(context, PREFERENCE_NAME_SETTINGS)
-        developer.load(context, PREFERENCE_NAME_DEVELOPER)
+        context.sendBroadcast(Intent().setAction(ACTION_WECHAT_STARTUP))
+
+        settings.listen(context)
+        settings.init(PREFERENCE_NAME_SETTINGS)
+        developer.listen(context)
+        developer.init(PREFERENCE_NAME_DEVELOPER)
 
         WechatPackage.init(lpparam)
         LocalizedStrings.init(settings)
@@ -151,14 +204,12 @@ class WechatHook : IXposedHookLoadPackage {
         tryHook(pluginLimits::breakSelectContactLimit)
         tryHook(pluginLimits::breakSelectConversationLimit)
 
-        // Wait until all the hook threads finished
-        hookThreadQueue.forEach { it.join() }
-        // Write the status of all the hooks
-        val wechatDataDir = getApplicationDataDir(context)
-        val magicianDataDir = wechatDataDir.replace(WECHAT_PACKAGE_NAME, MAGICIAN_PACKAGE_NAME)
-        WechatPackage.writeStatus("$magicianDataDir/$FOLDER_SHARED/status")
+        // Finish minor initializations
+        loadModuleResource(context)
+        WechatPackage.listen(context)
     }
 
+    // handleLoadWechatOnFly uses reflection to load updated module without reboot.
     private fun handleLoadWechatOnFly(lpparam: XC_LoadPackage.LoadPackageParam, context: Context) {
         (0 until 10).forEach { index ->
             val path = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
@@ -169,8 +220,9 @@ class WechatHook : IXposedHookLoadPackage {
             if (File(path).exists()) {
                 val pathClassLoader = PathClassLoader(path, ClassLoader.getSystemClassLoader())
                 val clazz = Class.forName("$MAGICIAN_PACKAGE_NAME.backend.WechatHook", true, pathClassLoader)
-                callMethod(clazz.newInstance(), "handleLoadWechat", lpparam, context)
-                return
+                val method = clazz.getDeclaredMethod("handleLoadWechat", lpparam.javaClass, Context::class.java)
+                method.isAccessible = true
+                method.invoke(clazz.newInstance(), lpparam, context); return
             }
         }
         log("Cannot load module on fly: APK not found")

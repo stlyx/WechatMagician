@@ -10,6 +10,7 @@ import com.gh0u1l5.wechatmagician.Global.SETTINGS_CHATTING_RECALL
 import com.gh0u1l5.wechatmagician.Global.SETTINGS_SNS_DELETE_COMMENT
 import com.gh0u1l5.wechatmagician.Global.SETTINGS_SNS_DELETE_MOMENT
 import com.gh0u1l5.wechatmagician.Global.STATUS_FLAG_DATABASE
+import com.gh0u1l5.wechatmagician.Global.tryWithLog
 import com.gh0u1l5.wechatmagician.backend.WechatPackage
 import com.gh0u1l5.wechatmagician.storage.LocalizedStrings
 import com.gh0u1l5.wechatmagician.storage.LocalizedStrings.LABEL_DELETED
@@ -23,7 +24,6 @@ import com.gh0u1l5.wechatmagician.util.MessageUtil
 import com.gh0u1l5.wechatmagician.util.MessageUtil.parseSnsComment
 import com.gh0u1l5.wechatmagician.util.PackageUtil
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.XposedHelpers.callMethod
 import de.robv.android.xposed.XposedHelpers.findAndHookMethod
@@ -163,9 +163,9 @@ object Database {
             return
         }
 
-        try {
+        tryWithLog {
             val msgId = values["msgId"] as Long
-            val msg = MessageCache[msgId] ?: return
+            val msg = MessageCache[msgId] ?: return@tryWithLog
 
             val copy = msg.javaClass.newInstance()
             PackageUtil.shadowCopy(msg, copy)
@@ -179,8 +179,6 @@ object Database {
                 1 -> pkg.MsgStorageInsertMethod.invoke(pkg.MsgStorageObject, copy)
                 2 -> pkg.MsgStorageInsertMethod.invoke(pkg.MsgStorageObject, copy, false)
             }
-        } catch (e: Throwable) {
-            XposedBridge.log("DB => Handle message recall failed: $e")
         }
     }
 

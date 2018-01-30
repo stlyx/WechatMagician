@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Build
 import android.os.SystemClock.elapsedRealtime
 import java.io.*
 import java.lang.System.currentTimeMillis
@@ -82,15 +81,6 @@ object FileUtil {
         context?.sendBroadcast(intent.apply {
             data = Uri.fromFile(File(path))
         })
-    }
-
-    // getApplicationDataDir returns the data directory of the given context for file operations.
-    fun getApplicationDataDir(context: Context?): String {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            context?.applicationInfo?.deviceProtectedDataDir
-        } else {
-            context?.applicationInfo?.dataDir
-        } ?: ""
     }
 
     @SuppressLint("SetWorldReadable")

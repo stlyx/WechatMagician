@@ -2,9 +2,10 @@ package com.gh0u1l5.wechatmagician.backend.plugins
 
 import android.app.AlertDialog
 import android.content.Context
-import android.content.Intent
+import android.content.Context.INPUT_METHOD_SERVICE
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.Toast
 import com.gh0u1l5.wechatmagician.Global.SETTINGS_CHATTING_CHATROOM_HIDER
@@ -55,13 +56,7 @@ object SearchBar {
                 val adapter = ConversationAdapter(context)
                 AlertDialog.Builder(context)
                         .setTitle("Wechat Magician")
-                        .setAdapter(adapter, { dialog, position ->
-                            val username = adapter.getItem(position).username
-                            context.startActivity(Intent(context, pkg.ChattingUI)
-                                    .putExtra("Chat_Mode", 1)
-                                    .putExtra("Chat_User", username))
-                            dialog.dismiss()
-                        })
+                        .setAdapter(adapter, { _, _ -> })
                         .setNegativeButton(str[BUTTON_CANCEL], { dialog, _ ->
                             dialog.dismiss()
                         })
@@ -128,7 +123,11 @@ object SearchBar {
                         val command = editable.toString()
                         if (command.endsWith("#")) {
                             val consumed = handleCommand(search.context, command.dropLast(1))
-                            if (consumed) editable?.clear()
+                            if (consumed) {
+                                val imm = search.context.getSystemService(INPUT_METHOD_SERVICE)
+                                (imm as InputMethodManager).hideSoftInputFromWindow(search.windowToken, 0)
+                                editable?.clear()
+                            }
                         }
                     }
                 })
