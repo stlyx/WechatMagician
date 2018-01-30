@@ -25,13 +25,14 @@
     <string name="prompt_need_reboot">Take effect after reboot.</string>
     <string name="prompt_wait">Please wait for a while.....</string>
     <string name="prompt_load_component_status_failed">Failed to retrieve the status of components.</string>
-    <string name="pref_warning_developer">These options will significantly slow down the Wechat, use them only if you know what are they. You need to reboot the device to perform any modifications.</string>
+    <string name="pref_description_settings">Unless expressly stated otherwise, these options take effect after modification immediately.</string>
+    <string name="pref_warning_developer">These debug options will significantly slow down Wechat. The changes will take effect after reboot.</string>
 
     <string name="status_component_title">Component Details</string>
     <string name="status_component_valid">Valid</string>
     <string name="status_component_invalid">Invalid</string>
     <string name="status_component_msg_storage">Message Storage Cache</string>
-    <string name="status_component_resources">UI Resource Hooks</string>
+    <string name="status_component_resources">UI Resource Redirection</string>
     <string name="status_component_database">SQLite Database Hijacking</string>
     <string name="status_component_xml_parser">XML Parser Hijacking</string>
     <string name="status_component_custom_scheme">URI Router Hijacking</string>
@@ -90,6 +91,6 @@
     <string name="pref_text_secret_friend_password">Configure Password for Secret Friends</string>
 
     <string name="support_report_subject">Wechat Magician Report</string>
-    <string name="support_report_text">Dear Developer,\nThe Xposed log and WechatPackage status has been attached. Currently my issue is:</string>
+    <string name="support_report_greetings">Dear Developer,\nThe Xposed log and WechatPackage status has been attached. Currently my issue is:</string>
 
 </resources>

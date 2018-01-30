@@ -1,15 +1,22 @@
-@file:Suppress("MemberVisibilityCanPrivate")
-
 package com.gh0u1l5.wechatmagician.backend
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Bundle
 import android.widget.BaseAdapter
+import com.gh0u1l5.wechatmagician.BuildConfig
 import com.gh0u1l5.wechatmagician.C
-import com.gh0u1l5.wechatmagician.Global.WECHAT_PACKAGE_NAME
+import com.gh0u1l5.wechatmagician.Global.ACTION_REQUIRE_HOOK_STATUS
+import com.gh0u1l5.wechatmagician.Global.ACTION_REQUIRE_WECHAT_PACKAGE
+import com.gh0u1l5.wechatmagician.Global.tryOrNull
+import com.gh0u1l5.wechatmagician.Global.tryWithLog
+import com.gh0u1l5.wechatmagician.Global.tryWithThread
 import com.gh0u1l5.wechatmagician.Version
+import com.gh0u1l5.wechatmagician.WaitChannel
 import com.gh0u1l5.wechatmagician.backend.plugins.ChatroomHider
 import com.gh0u1l5.wechatmagician.backend.plugins.SecretFriend
-import com.gh0u1l5.wechatmagician.util.FileUtil
 import com.gh0u1l5.wechatmagician.util.PackageUtil
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findClassIfExists
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findClassesFromPackage
@@ -22,27 +29,25 @@ import de.robv.android.xposed.XposedBridge.log
 import de.robv.android.xposed.XposedHelpers.*
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import net.dongliu.apk.parser.ApkFile
-import java.io.File
 import java.lang.ref.WeakReference
 import java.lang.reflect.Method
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
-import kotlin.concurrent.thread
 import kotlin.concurrent.write
 
 // WechatPackage analyzes and stores critical classes and objects in Wechat application.
 // These classes and objects will be used for hooking and tampering with runtime data.
 object WechatPackage {
 
-    // isInitialized indicates whether the WechatPackage has been initialized.
-    private val initializeChannel = java.lang.Object()
-    @Volatile var isInitialized = false
+    // initializeChannel resumes all the thread waiting for the WechatPackage initialization.
+    private val initializeChannel = WaitChannel()
 
     // status stores the working status of all the hooks.
     private val statusLock = ReentrantReadWriteLock()
     private val status: HashMap<String, Boolean> = hashMapOf()
 
     // These stores necessary information to match signatures.
+    @Volatile var packageName: String = ""
     @Volatile var loader: ClassLoader? = null
     @Volatile var version: Version? = null
     @Volatile var classes: List<String>? = null
@@ -53,56 +58,49 @@ object WechatPackage {
     @Volatile var MsgStorageObject: Any? = null
     @Volatile var ImgStorageObject: Any? = null
 
-    fun <T> innerLazy(name: String, initializer: () -> T?): Lazy<T> = lazy {
-        synchronized(initializeChannel) {
-            if (!isInitialized) {
-                initializeChannel.wait()
-            }
-        }
-        if (loader == null || version == null || classes == null) {
-            throw Error("Failed to evaluate $name: initialization failed.")
-        }
+    private fun <T> innerLazy(name: String, initializer: () -> T?): Lazy<T> = lazy {
+        initializeChannel.wait()
         initializer() ?: throw Error("Failed to evaluate $name")
     }
 
-    val WECHAT_PACKAGE_SQLITE: String by innerLazy("WECHAT_PACKAGE_SQLITE") {
+    private val WECHAT_PACKAGE_SQLITE: String by innerLazy("WECHAT_PACKAGE_SQLITE") {
         when {
             version!! >= Version("6.5.8") -> "com.tencent.wcdb"
             else -> "com.tencent.mmdb"
         }
     }
-    val WECHAT_PACKAGE_UI: String         = "$WECHAT_PACKAGE_NAME.ui"
-    val WECHAT_PACKAGE_SNS_UI: String     = "$WECHAT_PACKAGE_NAME.plugin.sns.ui"
-    val WECHAT_PACKAGE_GALLERY_UI: String = "$WECHAT_PACKAGE_NAME.plugin.gallery.ui"
+    private val WECHAT_PACKAGE_UI: String         by lazy { "$packageName.ui" }
+    private val WECHAT_PACKAGE_SNS_UI: String     by lazy { "$packageName.plugin.sns.ui" }
+    private val WECHAT_PACKAGE_GALLERY_UI: String by lazy { "$packageName.plugin.gallery.ui" }
 
     val LogCat: Class<*> by innerLazy("LogCat") {
-        findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_NAME.sdk.platformtools")
+        findClassesFromPackage(loader!!, classes!!, "$packageName.sdk.platformtools")
                 .filterByEnclosingClass(null)
                 .filterByMethod(C.Int, "getLogLevel")
                 .firstOrNull()
     }
     val XLogSetup: Class<*> by innerLazy("XLogSetup") {
-        findClassIfExists("$WECHAT_PACKAGE_NAME.xlog.app.XLogSetup", loader)
+        findClassIfExists("$packageName.xlog.app.XLogSetup", loader)
     }
     val WebWXLoginUI: Class<*> by innerLazy("WebWXLoginUI") {
-        findClassIfExists("$WECHAT_PACKAGE_NAME.plugin.webwx.ui.ExtDeviceWXLoginUI", loader)
+        findClassIfExists("$packageName.plugin.webwx.ui.ExtDeviceWXLoginUI", loader)
     }
     val RemittanceAdapter: Class<*> by innerLazy("RemittanceAdapter") {
-        findClassIfExists("$WECHAT_PACKAGE_NAME.plugin.remittance.ui.RemittanceAdapterUI", loader)
+        findClassIfExists("$packageName.plugin.remittance.ui.RemittanceAdapterUI", loader)
     }
     val ActionBarEditText: Class<*> by innerLazy("ActionBarEditText") {
-        findClassIfExists("$WECHAT_PACKAGE_NAME.ui.tools.ActionBarSearchView.ActionBarEditText", loader)
+        findClassIfExists("$packageName.ui.tools.ActionBarSearchView.ActionBarEditText", loader)
     }
 
     val WXCustomScheme: Class<*> by innerLazy("WXCustomScheme") {
-        findClassIfExists("$WECHAT_PACKAGE_NAME.plugin.base.stub.WXCustomSchemeEntryActivity", loader)
+        findClassIfExists("$packageName.plugin.base.stub.WXCustomSchemeEntryActivity", loader)
     }
     val WXCustomSchemeEntryMethod: Method by innerLazy("WXCustomSchemeEntryMethod") {
         findMethodsByExactParameters(WXCustomScheme, C.Boolean, C.Intent).firstOrNull()
     }
 
     val EncEngine: Class<*> by innerLazy("EncEngine") {
-        findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_NAME.modelsfs")
+        findClassesFromPackage(loader!!, classes!!, "$packageName.modelsfs")
                 .filterByMethod(null, "seek", C.Long)
                 .filterByMethod(null, "free")
                 .firstOrNull()
@@ -250,12 +248,12 @@ object WechatPackage {
     }
 
     val MsgInfoClass: Class<*> by innerLazy("MsgInfoClass") {
-        findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_NAME.storage")
+        findClassesFromPackage(loader!!, classes!!, "$packageName.storage")
                 .filterByMethod(C.Boolean, "isSystem")
                 .firstOrNull()
     }
     val ContactInfoClass: Class<*> by innerLazy("ContactInfoClass") {
-        findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_NAME.storage")
+        findClassesFromPackage(loader!!, classes!!, "$packageName.storage")
                 .filterByMethod(C.String, "getCityCode")
                 .filterByMethod(C.String, "getCountryCode")
                 .firstOrNull()
@@ -264,11 +262,11 @@ object WechatPackage {
     val MsgStorageClass: Class<*> by innerLazy("MsgStorageClass") {
         when {
             version!! >= Version("6.5.8") ->
-                findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_NAME.storage")
+                findClassesFromPackage(loader!!, classes!!, "$packageName.storage")
                         .filterByMethod(C.Long, MsgInfoClass, C.Boolean)
                         .firstOrNull()
             else ->
-                findClassesFromPackage(loader!!, classes!!, "$WECHAT_PACKAGE_NAME.storage")
+                findClassesFromPackage(loader!!, classes!!, "$packageName.storage")
                         .filterByMethod(C.Long, MsgInfoClass)
                         .firstOrNull()
         }
@@ -286,11 +284,11 @@ object WechatPackage {
         }
     }
 
-    val CacheMapClass = "$WECHAT_PACKAGE_NAME.a.f"
+    val CacheMapClass: String by lazy { "$packageName.a.f" }
     val CacheMapPutMethod = "k"
 
     val ImgStorageClass: Class<*> by innerLazy("ImgStorageClass") {
-        findClassesFromPackage(loader!!, classes!!, WECHAT_PACKAGE_NAME, 1)
+        findClassesFromPackage(loader!!, classes!!, packageName, 1)
                 .filterByMethod(C.String, ImgStorageLoadMethod, C.String, C.String, C.String, C.Boolean)
                 .firstOrNull()
     }
@@ -302,7 +300,7 @@ object WechatPackage {
     val ImgStorageLoadMethod = "a"
 
     val XMLParserClass: Class<*> by innerLazy("XMLParserClass") {
-        findClassesFromPackage(loader!!, classes!!,"$WECHAT_PACKAGE_NAME.sdk.platformtools")
+        findClassesFromPackage(loader!!, classes!!,"$packageName.sdk.platformtools")
                 .filterByMethod(C.Map, C.String, C.String)
                 .firstOrNull()
     }
@@ -310,33 +308,6 @@ object WechatPackage {
         findMethodsByExactParameters(
                 XMLParserClass, C.Map, C.String, C.String
         ).firstOrNull()
-    }
-
-    // init initializes necessary information for static analysis.
-    fun init(lpparam: XC_LoadPackage.LoadPackageParam) {
-        thread(start = true) {
-            try {
-                loader = lpparam.classLoader
-                version = getVersion(lpparam)
-
-                var apkFile: ApkFile? = null
-                try {
-                    apkFile = ApkFile(lpparam.appInfo.sourceDir)
-                    classes = apkFile.dexClasses.map { clazz ->
-                        PackageUtil.getClassName(clazz)
-                    }
-                } finally {
-                    apkFile?.close()
-                }
-            } finally {
-                synchronized(initializeChannel) {
-                    isInitialized = true
-                    initializeChannel.notifyAll()
-                }
-            }
-        }.setUncaughtExceptionHandler { _, throwable ->
-            log(throwable)
-        }
     }
 
     @JvmStatic fun hookAdapters() {
@@ -359,6 +330,53 @@ object WechatPackage {
         })
     }
 
+    // init initializes necessary information for static analysis.
+    fun init(lpparam: XC_LoadPackage.LoadPackageParam) {
+        tryWithThread {
+            try {
+                packageName = lpparam.packageName
+                loader = lpparam.classLoader
+                version = getVersion(lpparam)
+
+                var apkFile: ApkFile? = null
+                try {
+                    apkFile = ApkFile(lpparam.appInfo.sourceDir)
+                    classes = apkFile.dexClasses.map { clazz ->
+                        PackageUtil.getClassName(clazz)
+                    }
+                } finally {
+                    apkFile?.close()
+                }
+            } catch (t: Throwable) {
+                // Ignore this one
+            } finally {
+                initializeChannel.done()
+            }
+        }
+    }
+
+    // listen returns debug output to the frontend.
+    fun listen(context: Context) {
+        val requireHookStatusReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                statusLock.read {
+                    setResultExtras(Bundle().apply {
+                        putSerializable("status", status)
+                    })
+                }
+            }
+        }
+        val requireWechatPackageReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                resultData = this@WechatPackage.toString()
+            }
+        }
+        tryWithLog {
+            context.registerReceiver(requireHookStatusReceiver, IntentFilter(ACTION_REQUIRE_HOOK_STATUS))
+            context.registerReceiver(requireWechatPackageReceiver, IntentFilter(ACTION_REQUIRE_WECHAT_PACKAGE))
+        }
+    }
+
     // getVersion returns the version of current package / application
     private fun getVersion(lpparam: XC_LoadPackage.LoadPackageParam): Version {
         val activityThreadClass = findClass("android.app.ActivityThread", null)
@@ -375,32 +393,36 @@ object WechatPackage {
         }
     }
 
-    // writeStatus writes current status to the given path.
-    fun writeStatus(path: String) {
-        statusLock.read {
-            try {
-                FileUtil.writeOnce(path, {
-                    FileUtil.writeObjectToDisk(it, status)
-                })
-                FileUtil.setWorldReadable(File(path))
-            } catch (_: Throwable) {
-                // Ignore this one
-            }
-        }
-    }
-
     override fun toString(): String {
-        return this.javaClass.declaredFields.filter {
-            when(it.name) {
-                "INSTANCE", "status", "statusLock" -> false
-                "AddressAdapterObject" -> false
-                "ConversationAdapterObject" -> false
-                "MsgStorageObject" -> false
-                "ImgStorageObject" -> false
-                else -> true
+        val body = tryOrNull {
+            this.javaClass.declaredFields.filter { field ->
+                when (field.name) {
+                    "INSTANCE", "\$\$delegatedProperties",
+                    "initializeChannel",
+                    "status", "statusLock",
+                    "packageName", "loader", "version", "classes",
+                    "WECHAT_PACKAGE_SQLITE",
+                    "WECHAT_PACKAGE_UI",
+                    "WECHAT_PACKAGE_SNS_UI",
+                    "WECHAT_PACKAGE_GALLERY_UI" -> false
+                    else -> true
+                }
+            }.joinToString("\n") {
+                it.isAccessible = true
+                val key = it.name.removeSuffix("\$delegate")
+                var value = it.get(this)
+                if (value is WeakReference<*>) {
+                    value = value.get()
+                }
+                "$key = $value"
             }
-        }.joinToString("\n") {
-            it.isAccessible = true; "${it.name} = ${it.get(this)}"
         }
+
+        return """====================================================
+Wechat Package: $packageName
+Wechat Version: $version
+Module Version: ${BuildConfig.VERSION_NAME}
+${body?.removeSuffix("\n") ?: "Failed to generate report."}
+===================================================="""
     }
 }
