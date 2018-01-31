@@ -1,10 +1,13 @@
 package com.gh0u1l5.wechatmagician.backend.plugins
 
 import android.app.AndroidAppHelper
-import android.app.Notification
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
+import android.support.v4.app.NotificationCompat
+import android.support.v4.app.TaskStackBuilder
 import com.gh0u1l5.wechatmagician.C
 import com.gh0u1l5.wechatmagician.Global.SETTINGS_CHATTING_RECALL
 import com.gh0u1l5.wechatmagician.Global.SETTINGS_SNS_DELETE_COMMENT
@@ -32,14 +35,16 @@ object Database {
 
     private var preferences: Preferences? = null
 
-    @JvmStatic fun init(_preferences: Preferences) {
+    @JvmStatic
+    fun init(_preferences: Preferences) {
         preferences = _preferences
     }
 
     private val str = LocalizedStrings
     private val pkg = WechatPackage
 
-    @JvmStatic fun hookDatabase() {
+    @JvmStatic
+    fun hookDatabase() {
         // Hook SQLiteDatabase.openDatabase to initialize the database instance for SNS.
         findAndHookMethod(
                 pkg.SQLiteDatabase, "openDatabase",
@@ -137,20 +142,24 @@ object Database {
 
                 val context = AndroidAppHelper.currentApplication() as Context
                 val notifyMgr = context.applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                val parsedMsg = when (table) {
-                    "SnsComment" -> parseSnsComment(values)
+
+                when (table) {
+                    "SnsComment" -> {
+                        val parsedMsg = parseSnsComment(values) ?: return
+                        if (parsedMsg["content"].isNullOrBlank()) return
+                        val mBuilder = NotificationCompat.Builder(context)
+                                .setSmallIcon(android.R.drawable.sym_action_chat)
+                                .setContentTitle("${parsedMsg["sender"]}${str[PROMPT_SNS_NEW_COMMENT]}")
+                                .setContentText("${parsedMsg["content"]}")
+                                .setAutoCancel(true)
+                        val resultIntent = Intent(context, pkg.SnsTimeLineUI)
+                        val resultPendingIntent = TaskStackBuilder.create(context).addNextIntentWithParentStack(resultIntent)
+                                .getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT)
+                        mBuilder.setContentIntent(resultPendingIntent)
+                        notifyMgr.notify(parsedMsg.hashCode(), mBuilder.build())
+                    }
                     else -> return
                 }
-                if (parsedMsg?.get("content").isNullOrBlank()) return
-                val notification = when (table) {
-                    "SnsComment" -> Notification.Builder(context)
-                            .setSmallIcon(android.R.drawable.sym_action_chat)
-                            .setContentTitle("${parsedMsg?.get("sender")}${str[PROMPT_SNS_NEW_COMMENT]}")
-                            .setContentText("${parsedMsg?.get("content")}")
-                            .build()
-                    else -> return
-                }
-                notifyMgr.notify(notification.hashCode(), notification)
             }
         })
 

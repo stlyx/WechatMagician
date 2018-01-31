@@ -31,6 +31,7 @@ object LocalizedStrings {
     const val BUTTON_CLEAN_UNREAD           = "button_clean_unread"
     const val BUTTON_OK                     = "button_ok"
     const val BUTTON_CANCEL                 = "button_cancel"
+    const val PROMPT_SNS_NEW_COMMENT        = "prompt_sns_new_comment"
 
     @Volatile var preferences: Preferences? = null
     @Volatile var language: String = Locale.getDefault().language
@@ -58,7 +59,8 @@ object LocalizedStrings {
                     BUTTON_SELECT_ALL             to "全选",
                     BUTTON_CLEAN_UNREAD           to "清空全部未读提醒",
                     BUTTON_OK                     to "确定",
-                    BUTTON_CANCEL                 to "取消"
+                    BUTTON_CANCEL                 to "取消",
+                    PROMPT_SNS_NEW_COMMENT        to " 新评论"
             ),
             "en" to mapOf(
                     TITLE_SECRET_FRIEND           to "Secret Friends",
@@ -82,7 +84,8 @@ object LocalizedStrings {
                     BUTTON_SELECT_ALL             to "All",
                     BUTTON_CLEAN_UNREAD           to "Mark All as Read",
                     BUTTON_OK                     to "Okay",
-                    BUTTON_CANCEL                 to "Cancel"
+                    BUTTON_CANCEL                 to "Cancel",
+                    PROMPT_SNS_NEW_COMMENT        to " comments"
             )
     )
 
