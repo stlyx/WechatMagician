@@ -60,7 +60,7 @@ object LocalizedStrings {
                     BUTTON_CLEAN_UNREAD           to "清空全部未读提醒",
                     BUTTON_OK                     to "确定",
                     BUTTON_CANCEL                 to "取消",
-                    PROMPT_SNS_NEW_COMMENT        to " 新评论"
+                    PROMPT_SNS_NEW_COMMENT        to "评论于"
             ),
             "en" to mapOf(
                     TITLE_SECRET_FRIEND           to "Secret Friends",
@@ -85,7 +85,7 @@ object LocalizedStrings {
                     BUTTON_CLEAN_UNREAD           to "Mark All as Read",
                     BUTTON_OK                     to "Okay",
                     BUTTON_CANCEL                 to "Cancel",
-                    PROMPT_SNS_NEW_COMMENT        to " comments"
+                    PROMPT_SNS_NEW_COMMENT        to "commented at"
             )
     )
 

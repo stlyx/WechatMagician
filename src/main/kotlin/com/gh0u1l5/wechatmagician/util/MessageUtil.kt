@@ -48,8 +48,9 @@ object MessageUtil {
         return msg.copyOfRange(0, start) + len + "$head ".toByteArray() + msg.copyOfRange(start + lenSize, msg.size)
     }
 
-    fun parseSnsComment(cvs: ContentValues): Map<String, String>? {
+    fun parseSnsComment(cvs: ContentValues): Map<String, Any>? {
         val curActionBuf = cvs["curActionBuf"] as ByteArray? ?: return null
+        val createTime = cvs["createTime"] as Int
         val yourIdSize = curActionBuf[1].toInt()
         val myIdSize = curActionBuf[1 + yourIdSize + 2].toInt()
         val yourNameSize = curActionBuf[1 + yourIdSize + 2 + myIdSize + 2].toInt()
@@ -61,7 +62,8 @@ object MessageUtil {
         val name = curActionBuf.sliceArray((1 + yourIdSize + 2 + myIdSize + 3) .. (1 + yourIdSize + 2 + myIdSize + 2 + yourNameSize))
         return mapOf(
                 "content" to String(content),
-                "sender" to String(name)
+                "sender" to String(name),
+                "createTime" to createTime.toLong()*1000L
         )
     }
 

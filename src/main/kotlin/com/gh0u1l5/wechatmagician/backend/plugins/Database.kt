@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.support.v4.app.NotificationCompat
 import android.support.v4.app.TaskStackBuilder
+import android.text.format.DateFormat
 import com.gh0u1l5.wechatmagician.C
 import com.gh0u1l5.wechatmagician.Global.SETTINGS_CHATTING_RECALL
 import com.gh0u1l5.wechatmagician.Global.SETTINGS_SNS_DELETE_COMMENT
@@ -146,17 +147,19 @@ object Database {
                 when (table) {
                     "SnsComment" -> {
                         val parsedMsg = parseSnsComment(values) ?: return
-                        if (parsedMsg["content"].isNullOrBlank()) return
+                        if ((parsedMsg["content"] as String?).isNullOrBlank()) return
                         val mBuilder = NotificationCompat.Builder(context)
                                 .setSmallIcon(android.R.drawable.sym_action_chat)
-                                .setContentTitle("${parsedMsg["sender"]}${str[PROMPT_SNS_NEW_COMMENT]}")
+                                .setContentTitle("${parsedMsg["sender"]} ${str[PROMPT_SNS_NEW_COMMENT]} " +
+                                        DateFormat.format("h:mm:ss", parsedMsg["createTime"] as Long))
                                 .setContentText("${parsedMsg["content"]}")
                                 .setAutoCancel(true)
                         val resultIntent = Intent(context, pkg.SnsTimeLineUI)
+
                         val resultPendingIntent = TaskStackBuilder.create(context).addNextIntentWithParentStack(resultIntent)
                                 .getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT)
                         mBuilder.setContentIntent(resultPendingIntent)
-                        notifyMgr.notify(parsedMsg.hashCode(), mBuilder.build())
+                        notifyMgr.notify(Math.random().hashCode(), mBuilder.build())
                     }
                     else -> return
                 }
