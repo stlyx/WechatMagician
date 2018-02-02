@@ -11,11 +11,11 @@ import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_EXECUTE
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_INSERT
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_QUERY
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_UPDATE
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_TRACE_FILES
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_TRACE_LOGCAT
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_UI_DUMP_POPUP_MENU
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_UI_TOUCH_EVENT
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_UI_TRACE_ACTIVITIES
-import com.gh0u1l5.wechatmagician.Global.DEVELOPER_UI_XLOG
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_XML_PARSER
 import com.gh0u1l5.wechatmagician.backend.WechatPackage
 import com.gh0u1l5.wechatmagician.storage.Preferences
@@ -23,8 +23,11 @@ import com.gh0u1l5.wechatmagician.util.MessageUtil.argsToString
 import com.gh0u1l5.wechatmagician.util.MessageUtil.bundleToString
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findAndHookMethod
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge.*
+import de.robv.android.xposed.XposedBridge.hookAllConstructors
+import de.robv.android.xposed.XposedBridge.log
+import de.robv.android.xposed.XposedHelpers.findAndHookConstructor
 import de.robv.android.xposed.XposedHelpers.findAndHookMethod
+import java.io.File
 
 object Developer {
 
@@ -105,19 +108,6 @@ object Developer {
                         log("POPUP => adapter.item[$index] = ${adapter.getItem(index)}")
                         log("POPUP => adapter.item[$index].class = ${adapter.getItem(index).javaClass}")
                     }
-                }
-            })
-        }
-    }
-
-    // Hook XLog to print internal errors into logcat.
-    @JvmStatic fun enableXLog() {
-        if (preferences!!.getBoolean(DEVELOPER_UI_XLOG, false)) {
-            hookAllMethods(
-                    pkg.XLogSetup, "keep_setupXLog", object : XC_MethodHook() {
-                @Throws(Throwable::class)
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    param.args[5] = true // enable logcat output
                 }
             })
         }
@@ -223,6 +213,39 @@ object Developer {
                     }
                 })
             }
+        }
+    }
+
+    // Hook FileInputStream / FileOutputStream to trace file operations.
+    @JvmStatic fun traceFiles() {
+        if (preferences!!.getBoolean(DEVELOPER_TRACE_FILES, false)) {
+            findAndHookConstructor(
+                    "java.io.FileInputStream", pkg.loader,
+                    C.File, object : XC_MethodHook() {
+                @Throws(Throwable::class)
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val path = (param.args[0] as File?)?.absolutePath ?: return
+                    log("FILE => Read $path")
+                }
+            })
+
+            findAndHookConstructor(
+                    "java.io.FileOutputStream", pkg.loader,
+                    C.File, C.Boolean, object : XC_MethodHook() {
+                @Throws(Throwable::class)
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val path = (param.args[0] as File?)?.absolutePath ?: return
+                    log("FILE => Write $path")
+                }
+            })
+
+            findAndHookMethod(
+                    "java.io.File", pkg.loader, "delete", object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val file = param.thisObject as File
+                    log("FILE => Delete ${file.absolutePath}")
+                }
+            })
         }
     }
 

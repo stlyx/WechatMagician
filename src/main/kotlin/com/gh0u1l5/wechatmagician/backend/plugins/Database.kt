@@ -36,16 +36,14 @@ object Database {
 
     private var preferences: Preferences? = null
 
-    @JvmStatic
-    fun init(_preferences: Preferences) {
+    @JvmStatic fun init(_preferences: Preferences) {
         preferences = _preferences
     }
 
     private val str = LocalizedStrings
     private val pkg = WechatPackage
 
-    @JvmStatic
-    fun hookDatabase() {
+    @JvmStatic fun hookDatabase() {
         // Hook SQLiteDatabase.openDatabase to initialize the database instance for SNS.
         findAndHookMethod(
                 pkg.SQLiteDatabase, "openDatabase",
@@ -124,6 +122,22 @@ object Database {
                         val curActionBuf = values["curActionBuf"] as ByteArray?
                         handleCommentDelete(curActionBuf, values)
                     }
+                }
+            }
+        })
+
+        findAndHookMethod(
+                pkg.SQLiteDatabase, "delete",
+                C.String, C.String, C.StringArray, object : XC_MethodHook() {
+            @Throws(Throwable::class)
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                if (!preferences!!.getBoolean(SETTINGS_CHATTING_RECALL, true)) {
+                    return
+                }
+
+                val table = param.args[0] as String?
+                when (table) {
+                    "ImgInfo2", "videoinfo2", "WxFileIndex2" -> param.result = 1
                 }
             }
         })
