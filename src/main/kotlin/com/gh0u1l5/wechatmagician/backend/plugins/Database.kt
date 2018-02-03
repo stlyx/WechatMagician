@@ -165,7 +165,7 @@ object Database {
                         val mBuilder = NotificationCompat.Builder(context)
                                 .setSmallIcon(android.R.drawable.sym_action_chat)
                                 .setContentTitle("${parsedMsg["sender"]} ${str[PROMPT_SNS_NEW_COMMENT]} " +
-                                        DateFormat.format("h:mm:ss", parsedMsg["createTime"] as Long))
+                                        DateFormat.format("H:mm:ss", parsedMsg["createTime"] as Long))
                                 .setContentText("${parsedMsg["content"]}")
                                 .setAutoCancel(true)
                         val resultIntent = Intent(context, pkg.SnsTimeLineUI)
