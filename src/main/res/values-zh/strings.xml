@@ -47,6 +47,7 @@
     <string name="pref_toggle_database_update">跟踪更新操作</string>
     <string name="pref_toggle_database_delete">跟踪删除操作</string>
     <string name="pref_toggle_database_execute">跟踪SQL命令执行</string>
+    <string name="pref_toggle_database_password">记录EnMicroMsg.db密码</string>
 
     <string name="pref_category_developer_miscellaneous">其他逆向工具</string>
     <string name="pref_toggle_trace_logcat">跟踪LogCat事件</string>

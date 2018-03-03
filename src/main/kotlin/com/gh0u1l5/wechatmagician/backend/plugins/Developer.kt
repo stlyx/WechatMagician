@@ -9,6 +9,7 @@ import com.gh0u1l5.wechatmagician.C
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_DELETE
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_EXECUTE
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_INSERT
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_PASSWORD
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_QUERY
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_UPDATE
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_TRACE_FILES
@@ -188,6 +189,22 @@ object Developer {
                     val sql = param.args[0] as String?
                     val bindArgs = param.args[1] as Array<*>?
                     log("DB => executeSql sql = $sql, bindArgs = ${argsToString(bindArgs)}, db = ${param.thisObject}")
+                }
+            })
+        }
+
+        if (preferences!!.getBoolean(DEVELOPER_DATABASE_PASSWORD, false)) {
+            findAndHookMethod(
+                    pkg.SQLiteDatabase, "openDatabase",
+                    C.String, C.ByteArray, pkg.SQLiteCipherSpec, pkg.SQLiteCursorFactory,
+                    C.Int, pkg.SQLiteErrorHandler, C.Int, object : XC_MethodHook() {
+                @Throws(Throwable::class)
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val path = param.args[0] as String? ?: return
+                    if (path.endsWith("EnMicroMsg.db")) {
+                        val password = param.args[1] as ByteArray? ?: return
+                        log("DB => EnMicroMsg.db password = \"${String(password)}\"")
+                    }
                 }
             })
         }

@@ -57,6 +57,7 @@ object Global {
     const val DEVELOPER_DATABASE_UPDATE     = "developer_database_update"
     const val DEVELOPER_DATABASE_DELETE     = "developer_database_delete"
     const val DEVELOPER_DATABASE_EXECUTE    = "developer_database_execute"
+    const val DEVELOPER_DATABASE_PASSWORD   = "developer_database_password"
     const val DEVELOPER_TRACE_LOGCAT        = "developer_trace_logcat"
     const val DEVELOPER_TRACE_FILES         = "developer_trace_files"
     const val DEVELOPER_XML_PARSER          = "developer_xml_parser"
