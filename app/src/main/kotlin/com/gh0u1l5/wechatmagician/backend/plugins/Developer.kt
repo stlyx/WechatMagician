@@ -8,6 +8,7 @@ import android.widget.ListAdapter
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_DELETE
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_EXECUTE
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_INSERT
+import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_PASSWORD
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_QUERY
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_DATABASE_UPDATE
 import com.gh0u1l5.wechatmagician.Global.DEVELOPER_TRACE_FILES
@@ -23,6 +24,8 @@ import com.gh0u1l5.wechatmagician.spellbook.mirror.mm.sdk.platformtools.Classes.
 import com.gh0u1l5.wechatmagician.spellbook.mirror.mm.sdk.platformtools.Classes.XmlParser
 import com.gh0u1l5.wechatmagician.spellbook.mirror.mm.sdk.platformtools.Methods.XmlParser_parse
 import com.gh0u1l5.wechatmagician.spellbook.mirror.mm.ui.base.Classes.MMListPopupWindow
+import com.gh0u1l5.wechatmagician.spellbook.mirror.wcdb.Classes.SQLiteErrorHandler
+import com.gh0u1l5.wechatmagician.spellbook.mirror.wcdb.database.Classes.SQLiteCipherSpec
 import com.gh0u1l5.wechatmagician.spellbook.mirror.wcdb.database.Classes.SQLiteCursorFactory
 import com.gh0u1l5.wechatmagician.spellbook.mirror.wcdb.database.Classes.SQLiteDatabase
 import com.gh0u1l5.wechatmagician.spellbook.mirror.wcdb.support.Classes.SQLiteCancellationSignal
@@ -181,6 +184,22 @@ object Developer {
                     val sql = param.args[0] as String?
                     val bindArgs = param.args[1] as Array<*>?
                     log("DB => executeSql sql = $sql, bindArgs = ${argsToString(bindArgs)}, db = ${param.thisObject}")
+                }
+            })
+        }
+
+        if (pref.getBoolean(DEVELOPER_DATABASE_PASSWORD, false)) {
+            findAndHookMethod(
+                    SQLiteDatabase, "openDatabase",
+                    C.String, C.ByteArray, SQLiteCipherSpec, SQLiteCursorFactory,
+                    C.Int, SQLiteErrorHandler, C.Int, object : XC_MethodHook() {
+                @Throws(Throwable::class)
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val path = param.args[0] as String? ?: return
+                    if (path.endsWith("EnMicroMsg.db")) {
+                        val password = param.args[1] as ByteArray? ?: return
+                        log("DB => EnMicroMsg.db password = ${String(password)}")
+                    }
                 }
             })
         }

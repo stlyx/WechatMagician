@@ -107,6 +107,7 @@
     <string name="pref_toggle_database_update">Trace Update</string>
     <string name="pref_toggle_database_delete">Trace Delete</string>
     <string name="pref_toggle_database_execute">Trace Execute</string>
+    <string name="pref_toggle_database_password">Dump EnMicroMsg.db Password</string>
 
     <string name="pref_category_developer_miscellaneous">Miscellaneous</string>
     <string name="pref_toggle_trace_logcat">Trace LogCat</string>
