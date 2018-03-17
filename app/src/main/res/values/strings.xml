@@ -28,6 +28,7 @@
     <string name="prompt_need_reboot">Take effect after reboot.</string>
     <string name="prompt_screenshot">The screenshot has been saved to</string>
     <string name="prompt_sns_invalid">Record is invalid or deleted.</string>
+    <string name="prompt_sns_new_comment">comments at</string>
     <string name="prompt_wait">Please wait for a while.....</string>
     <string name="prompt_load_component_status_failed">Failed to retrieve the status of components.</string>
 
@@ -82,6 +83,7 @@
     <string name="pref_toggle_sns_adblock">Block WeChat Advertisements</string>
     <string name="pref_toggle_prevent_moment_delete">Prevent Deleting Moments</string>
     <string name="pref_toggle_prevent_comment_delete">Prevent Deleting Comments</string>
+    <string name="pref_toggle_new_comment_notification">Show Notifications for New Comments</string>
     <string name="pref_toggle_keyword_blacklist">Toggle Keyword Blacklist</string>
     <string name="pref_toggle_keyword_blacklist_summary">See goodbye to those PDA couples!</string>
     <string name="pref_list_keyword_blacklist">Keyword Blacklist</string>
