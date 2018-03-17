@@ -1,6 +1,8 @@
 package com.gh0u1l5.wechatmagician.util
 
+import android.content.ContentValues
 import android.os.Bundle
+import com.gh0u1l5.wechatmagician.backend.storage.database.MainDatabase
 import java.math.BigInteger
 
 // MessageUtil is a helper object for processing Wechat internal strings / byte arrays.
@@ -45,6 +47,26 @@ object MessageUtil {
 
         val len = encodeMsgSize("$head ".toByteArray().size + msgSize)
         return msg.copyOfRange(0, start) + len + "$head ".toByteArray() + msg.copyOfRange(start + lenSize, msg.size)
+    }
+
+    fun parseSnsComment(cvs: ContentValues): Map<String, Any>? {
+        val curActionBuf = cvs["curActionBuf"] as ByteArray? ?: return null
+        val createTime = cvs["createTime"] as Int
+        val yourIdSize = curActionBuf[1].toInt()
+        val myIdSize = curActionBuf[1 + yourIdSize + 2].toInt()
+        val yourNameSize = curActionBuf[1 + yourIdSize + 2 + myIdSize + 2].toInt()
+        val myNameSize = curActionBuf[1 + yourIdSize + 2 + myIdSize + 2 + yourNameSize + 2].toInt()
+        val msgStart = 1 + yourIdSize + 2 + myIdSize + 2 + yourNameSize + 1 + myNameSize + 13
+
+        val (lenSize, msgSize) = decodeMsgSize(msgStart, curActionBuf)
+        val content = curActionBuf.sliceArray((msgStart + lenSize) until (msgStart + lenSize + msgSize))
+        val nickname = curActionBuf.sliceArray((1 + yourIdSize + 2 + myIdSize + 3) .. (1 + yourIdSize + 2 + myIdSize + 2 + yourNameSize))
+        val remarkOrNickname = MainDatabase.getContactByNickname(String(nickname))?.remarkOrNickname ?: nickname
+        return mapOf(
+                "content" to String(content),
+                "sender" to remarkOrNickname,
+                "createTime" to createTime.toLong()*1000L
+        )
     }
 
     fun argsToString(args: Array<*>?): String? {

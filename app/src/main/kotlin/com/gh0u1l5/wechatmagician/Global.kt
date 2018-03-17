@@ -51,6 +51,7 @@ object Global {
     const val SETTINGS_SNS_DELETE_MOMENT              = "settings_sns_delete_moment"
     const val SETTINGS_SNS_KEYWORD_BLACKLIST          = "settings_sns_keyword_blacklist"
     const val SETTINGS_SNS_KEYWORD_BLACKLIST_CONTENT  = "settings_sns_keyword_blacklist_content"
+    const val SETTINGS_SNS_NEW_COMMENT_NOTIFICATION   = "settings_sns_new_comment_notification"
 
     const val DEVELOPER_UI_TOUCH_EVENT      = "developer_ui_touch_event"
     const val DEVELOPER_UI_TRACE_ACTIVITIES = "developer_ui_trace_activities"

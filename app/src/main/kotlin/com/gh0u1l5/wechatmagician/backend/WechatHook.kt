@@ -65,6 +65,7 @@ class WechatHook : IXposedHookLoadPackage {
                 ObjectsHunter,
                 SecretFriend,
                 SnsBlock,
+                SnsCommentNotify,
                 SnsForward
         )
 
