@@ -53,6 +53,10 @@
             android:key="settings_sns_delete_comment"
             android:title="@string/pref_toggle_prevent_comment_delete" />
         <SwitchPreference
+            android:defaultValue="true"
+            android:key="settings_sns_new_comment_notification"
+            android:title="@string/pref_toggle_new_comment_notification" />
+        <SwitchPreference
             android:defaultValue="false"
             android:key="settings_sns_keyword_blacklist"
             android:summary="@string/pref_toggle_keyword_blacklist_summary"

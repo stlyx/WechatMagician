@@ -10,7 +10,8 @@ object MainDatabase {
     data class Contact(
             val alias: String,
             val username: String,
-            val nickname: String
+            val nickname: String,
+            val remarkOrNickname: String
     )
 
     data class Conversation(
@@ -34,7 +35,7 @@ object MainDatabase {
         val database = MainDatabaseObject ?: return null
         var cursor: Any? = null
         try {
-            val columns = arrayOf("alias", "username", "nickname")
+            val columns = arrayOf("alias", "username", "nickname", "conRemark")
             cursor = callMethod(database, "query",
                     "rcontact", columns, selection, selectionArgs,
                     null, null, null, null
@@ -51,7 +52,9 @@ object MainDatabase {
                 val alias    = callMethod(cursor, "getString", 0) as String
                 val username = callMethod(cursor, "getString", 1) as String
                 val nickname = callMethod(cursor, "getString", 2) as String
-                Contact(alias, username, nickname)
+                val remark   = callMethod(cursor, "getString", 3) as String
+                val remarkOrNickname = if (remark.isNullOrBlank()) nickname else remark
+                Contact(alias, username, nickname, remarkOrNickname)
             }
         } catch (t: Throwable) {
             log(t); return null
