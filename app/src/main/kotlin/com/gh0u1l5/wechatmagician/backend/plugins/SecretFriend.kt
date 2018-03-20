@@ -10,7 +10,6 @@ import com.gh0u1l5.wechatmagician.Global.SETTINGS_SECRET_FRIEND_HIDE_OPTION
 import com.gh0u1l5.wechatmagician.Global.SETTINGS_SECRET_FRIEND_PASSWORD
 import com.gh0u1l5.wechatmagician.R
 import com.gh0u1l5.wechatmagician.backend.WechatHook
-import com.gh0u1l5.wechatmagician.backend.WechatHook.Companion.resources
 import com.gh0u1l5.wechatmagician.backend.storage.Strings
 import com.gh0u1l5.wechatmagician.backend.storage.database.MainDatabase.getContactByNickname
 import com.gh0u1l5.wechatmagician.backend.storage.list.SecretFriendList
@@ -21,7 +20,6 @@ import com.gh0u1l5.wechatmagician.spellbook.hookers.MenuAppender
 import com.gh0u1l5.wechatmagician.spellbook.interfaces.*
 import com.gh0u1l5.wechatmagician.spellbook.mirror.mm.ui.chatting.Classes.ChattingUI
 import com.gh0u1l5.wechatmagician.util.PasswordUtil
-import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedHelpers.getObjectField
 
 object SecretFriend : IActivityHook, IAdapterHook, INotificationHook, IPopupMenuHook, ISearchBarConsole {
@@ -75,24 +73,18 @@ object SecretFriend : IActivityHook, IAdapterHook, INotificationHook, IPopupMenu
         if (activity::class.java == ChattingUI) {
             val username = activity.intent.getStringExtra("Chat_User")
             if (username in SecretFriendList) {
-                val promptUserNotFound = resources?.getString(R.string.prompt_user_not_found)
-                        ?: "User Not Found!"
+                val promptUserNotFound = Strings.getString(R.string.prompt_user_not_found)
                 Toast.makeText(activity, promptUserNotFound, Toast.LENGTH_SHORT).show()
                 activity.finish()
             }
         }
     }
 
-    // Hide the message notifications from secret friends.
-    override fun onMessageNotificationAdding(param: XC_MethodHook.MethodHookParam) {
+    override fun onMessageHandling(message: INotificationHook.Message): Boolean {
         if (!isPluginEnabled()) {
-            return
+            return false
         }
-        val notification = param.args[0].toString()
-        val username = notification.substringAfter("userName: ").substringBefore(",")
-        if (username in SecretFriendList) {
-            param.result = null
-        }
+        return message.talker in SecretFriendList
     }
 
     // Add menu items in the popup menu for contacts.
@@ -110,18 +102,14 @@ object SecretFriend : IActivityHook, IAdapterHook, INotificationHook, IPopupMenu
     }
 
     // Handle SearchBar commands to operate on secret friends.
-    // TODO: use XML for popup dialogs
     override fun onHandleCommand(context: Context, command: String): Boolean {
         if (!isPluginEnabled()) {
             return false
         }
 
-        val titleSecretFriend = resources?.getString(R.string.title_secret_friend)
-                ?: "Secret Friend"
-        val promptPasswordMissing = resources?.getString(R.string.prompt_password_missing)
-                ?: "Please set your password first!"
-        val promptVerifyPassword = resources?.getString(R.string.prompt_verify_password)
-                ?: "Please enter your password:"
+        val titleSecretFriend = Strings.getString(R.string.title_secret_friend)
+        val promptPasswordMissing = Strings.getString(R.string.prompt_password_missing)
+        val promptVerifyPassword = Strings.getString(R.string.prompt_verify_password)
 
         when {
             command.startsWith("hide ") -> {
