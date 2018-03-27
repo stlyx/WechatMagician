@@ -30,7 +30,7 @@
     <string name="prompt_need_reboot">Take effect after reboot.</string>
     <string name="prompt_screenshot">The screenshot has been saved to</string>
     <string name="prompt_sns_invalid">Record is invalid or deleted.</string>
-    <string name="prompt_sns_new_comment">comments at</string>
+    <string name="prompt_sns_new_comment">new comment</string>
     <string name="prompt_update_discovered">Update Discovered</string>
     <string name="prompt_wait">Please wait for a while.....</string>
 

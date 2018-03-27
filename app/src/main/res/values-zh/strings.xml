@@ -30,7 +30,7 @@
     <string name="prompt_need_reboot">重启后生效</string>
     <string name="prompt_screenshot">截图已保存至</string>
     <string name="prompt_sns_invalid">数据失效或已删除</string>
-    <string name="prompt_sns_new_comment">评论于</string>
+    <string name="prompt_sns_new_comment">新评论</string>
     <string name="prompt_update_discovered">发现更新</string>
     <string name="prompt_wait">请稍候片刻……</string>
 

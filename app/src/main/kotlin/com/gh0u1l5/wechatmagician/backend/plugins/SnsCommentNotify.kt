@@ -47,8 +47,7 @@ object SnsCommentNotify : IDatabaseHook {
         if ((parsedMsg["content"] as String?).isNullOrBlank()) return
         val mBuilder = NotificationCompat.Builder(context)
                 .setSmallIcon(android.R.drawable.sym_action_chat)
-                .setContentTitle("${parsedMsg["sender"]} ${resources?.getString(R.string.prompt_sns_new_comment) ?: "comments at"} " +
-                        DateFormat.format("H:mm:ss", parsedMsg["createTime"] as Long))
+                .setContentTitle("${parsedMsg["sender"]} ${resources?.getString(R.string.prompt_sns_new_comment) ?: "new comment"} ")
                 .setContentText("${parsedMsg["content"]}")
                 .setAutoCancel(true)
         val resultIntent = Intent(context, SnsTimeLineUI)
