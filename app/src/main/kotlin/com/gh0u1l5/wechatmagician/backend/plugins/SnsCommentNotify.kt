@@ -24,7 +24,7 @@ object SnsCommentNotify : IDatabaseHook {
 
     private val pref = WechatHook.settings
 
-    override fun onDatabaseInserting(thisObject: Any, table: String, nullColumnHack: String?, initialValues: ContentValues?, conflictAlgorithm: Int): Operation<Long?> {
+    override fun onDatabaseInserting(thisObject: Any, table: String, nullColumnHack: String?, initialValues: ContentValues?, conflictAlgorithm: Int): Operation<Long> {
         when (table) {
             "SnsComment" -> { // new moment comment related to me received
                 if (!pref.getBoolean(Global.SETTINGS_SNS_NEW_COMMENT_NOTIFICATION, true)) {
