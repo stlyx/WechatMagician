@@ -23,7 +23,6 @@ import com.gh0u1l5.wechatmagician.util.PackageUtil.findClassesFromPackage
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findFieldsWithGenericType
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findFieldsWithType
 import com.gh0u1l5.wechatmagician.util.PackageUtil.findMethodsByExactParameters
-import com.tencent.wcdb.database.SQLiteCipherSpec
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedBridge.log
@@ -112,9 +111,6 @@ object WechatPackage {
     }
     val SQLiteCursorFactory: Class<*> by innerLazy("SQLiteCursorFactory") {
         findClassIfExists("$WECHAT_PACKAGE_SQLITE.database.SQLiteDatabase.CursorFactory", loader)
-    }
-    val SQLiteCipherSpec: Class<*> by innerLazy("SQLiteCipherSpec") {
-        findClassIfExists("$WECHAT_PACKAGE_SQLITE.database.SQLiteCipherSpec", loader)
     }
     val SQLiteErrorHandler: Class<*> by innerLazy("SQLiteErrorHandler") {
         findClassIfExists("$WECHAT_PACKAGE_SQLITE.DatabaseErrorHandler", loader)

@@ -40,10 +40,6 @@
             android:defaultValue="false"
             android:key="developer_database_execute"
             android:title="@string/pref_toggle_database_execute" />
-        <SwitchPreference
-            android:defaultValue="false"
-            android:key="developer_database_password"
-            android:title="@string/pref_toggle_database_password" />
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/pref_category_developer_miscellaneous">
         <SwitchPreference
